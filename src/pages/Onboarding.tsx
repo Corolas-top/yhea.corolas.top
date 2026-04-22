@@ -43,7 +43,7 @@ export default function Onboarding() {
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
-    await (supabase.from('profiles') as any).insert({
+    await (supabase.from('student_profiles') as any).insert({
       user_id: user.id, curriculum, year, subjects,
       language_tests: langTests, language_target_scores: langScores,
       standardized_tests: stdTests, standardized_target_scores: stdScores,
