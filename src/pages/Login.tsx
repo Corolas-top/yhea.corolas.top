@@ -42,7 +42,7 @@ export default function Login() {
               <GraduationCap className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-white">Welcome to Yhea</h1>
-            <p className="text-gray-400 text-sm mt-1">AI Learning Companion</p>
+            <p className="text-gray-400 text-sm mt-1">Platform of International Education</p>
           </div>
 
           <div className="flex bg-[#0f172a] rounded-lg p-1 mb-5">
