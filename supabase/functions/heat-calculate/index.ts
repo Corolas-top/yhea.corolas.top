@@ -21,7 +21,7 @@ serve(async (req) => {
     // Calculate heat scores for all published notes
     const { data: notes, error } = await supabase
       .from('notes')
-      .select('id, likes_count, bookmarks_count, comments_count, shares_count, quality_score, published_at, author_id')
+      .select('id, likes_count, bookmarks_count, comments_count, views_count, quality_score, published_at, author_id')
       .eq('visibility', 'published');
 
     if (error) throw error;
@@ -35,8 +35,8 @@ serve(async (req) => {
         (note.likes_count || 0) * 2 +
         (note.bookmarks_count || 0) * 3 +
         (note.comments_count || 0) * 5 +
-        (note.shares_count || 0) * 8 +
-        (note.quality_score || 0) * 0.5;
+        (note.views_count || 0) * 0.5 +
+        (note.quality_score || 0) * 1;
 
       const heatScore = Math.round(interactionScore * timeDecay);
 

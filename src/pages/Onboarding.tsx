@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { GraduationCap, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -19,7 +18,6 @@ const COUNTRIES = ['USA', 'UK', 'Canada', 'Australia', 'Singapore', 'Hong Kong',
 
 export default function Onboarding() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [curriculum, setCurriculum] = useState('');
   const [year, setYear] = useState(0);
@@ -43,15 +41,18 @@ export default function Onboarding() {
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
-    await (supabase.from('student_profiles') as any).insert({
-      user_id: user.id, curriculum, year, subjects,
+    await (supabase.from('student_profiles') as any).update({
+      curriculum, year, subjects,
       language_tests: langTests, language_target_scores: langScores,
       standardized_tests: stdTests, standardized_target_scores: stdScores,
       target_countries: targetCountries,
-    });
-    await (supabase.from('users') as any).update({ bio, tags: tags.split(',').map(t => t.trim()).filter(Boolean) }).eq('id', user.id);
+    }).eq('user_id', user.id);
+    await (supabase.from('users') as any).update({
+      bio,
+      tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+    }).eq('id', user.id);
     setLoading(false);
-    navigate('/dashboard');
+    window.location.href = '/#/dashboard';
   };
 
   const steps = [

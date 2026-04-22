@@ -42,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.from('users').select('*').eq('id', uid).single();
       if (data) {
         setUser(data as AuthUser);
-        // Check if profile exists
-        const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', uid).single();
-        setNeedsOnboarding(!profile);
+        // Check if profile has been completed (curriculum not default)
+        const { data: profile } = await supabase.from('student_profiles').select('curriculum, year').eq('user_id', uid).single();
+        setNeedsOnboarding(!profile || profile.curriculum === 'AP' && profile.year === 1);
       }
     } catch {
       setUser(null);

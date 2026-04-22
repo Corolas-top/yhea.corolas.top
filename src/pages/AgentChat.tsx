@@ -33,17 +33,20 @@ export default function AgentChat() {
     try {
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`, {
+      const funcUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
+      const res = await fetch(funcUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
-        body: JSON.stringify({ message: input, agent_type: agentType, session_id: 'new' }),
+        body: JSON.stringify({ message: input, student_id: session?.user?.id || '', session_id: 'new', subject: agentType || 'teaching' }),
       });
-      if (!res.ok) throw new Error('API error');
-      const text = await res.text();
-      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      // Handle non-streaming JSON response
+      const data = await res.json();
+      const reply = data.reply || data.content || data.message || JSON.stringify(data);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch {
       // Fallback demo response
       setTimeout(() => {
