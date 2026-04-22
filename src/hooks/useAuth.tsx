@@ -1,53 +1,65 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { User } from '@/types';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+  bio?: string;
+  tags?: string[];
+  role: 'student' | 'admin';
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isAdmin: boolean;
   isLoading: boolean;
+  needsOnboarding: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error?: string }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
-  useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchUser(session.user.id);
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchUser(session.user.id);
-      } else {
+  const fetchUser = useCallback(async (authId?: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         setUser(null);
         setIsLoading(false);
+        return;
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUser = async (authId: string) => {
-    const { data } = await supabase.from('users').select('*').eq('id', authId).single();
-    if (data) {
-      setUser(data as User);
+      const uid = authId || session.user.id;
+      const { data } = await supabase.from('users').select('*').eq('id', uid).single();
+      if (data) {
+        setUser(data as AuthUser);
+        // Check if profile exists
+        const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', uid).single();
+        setNeedsOnboarding(!profile);
+      }
+    } catch {
+      setUser(null);
     }
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) fetchUser(session.user.id);
+      else { setUser(null); setIsLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, [fetchUser]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -55,17 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
-    if (data.user) {
-      await (supabase.from('users') as any).insert({
-        id: data.user.id,
-        email,
-        name,
-        role: 'student',
-      });
-    }
-    return {};
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { name } }
+    });
+    return { error: error?.message };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
@@ -80,15 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    await fetchUser();
+  }, [fetchUser]);
+
   return (
     <AuthContext.Provider value={{
-      user,
-      isAdmin: user?.role === 'admin',
-      isLoading,
-      signIn,
-      signUp,
-      signInWithGoogle,
-      signOut,
+      user, isAdmin: user?.role === 'admin', isLoading, needsOnboarding,
+      signIn, signUp, signInWithGoogle, signOut, refreshUser
     }}>
       {children}
     </AuthContext.Provider>

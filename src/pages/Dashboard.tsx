@@ -1,173 +1,116 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useCourses, useTasks, usePoints, useChat, useNotes } from '@/hooks/useStore';
-import {
-  Sparkles, BookOpen, Compass, StickyNote, Trophy,
-  Flame, ArrowRight, Zap,
-  Calendar, CheckCircle2, Circle, AlertCircle
-} from 'lucide-react';
+import { Bot, BookOpen, Target, StickyNote, Trophy, Zap, CalendarDays, CheckCircle2, Circle, Flame, TrendingUp } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { courses } = useCourses();
-  const { tasks } = useTasks();
-  const { balance, quota } = usePoints();
-  const { sessions } = useChat();
-  const { notes } = useNotes();
-
-  const activeCourses = courses.filter(c => c.is_active);
-  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress');
-  const completedToday = tasks.filter(t => t.status === 'completed').length;
-  const myNotes = notes.filter(n => n.author_id === 'demo');
 
   const quickActions = [
-    { label: 'Ask Yhea', icon: Sparkles, path: '/agent', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-    { label: 'Continue Learning', icon: BookOpen, path: '/learning', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-    { label: 'Plan My Future', icon: Compass, path: '/planning', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-    { label: 'Write Note', icon: StickyNote, path: '/notes', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+    { label: 'Ask Agent', icon: Bot, path: '/agent', desc: 'Get help from AI', color: 'bg-blue-600/20 text-blue-400 border-blue-500/20' },
+    { label: 'Continue Learning', icon: BookOpen, path: '/learning', desc: 'Your courses', color: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/20' },
+    { label: 'Check Plan', icon: Target, path: '/planning', desc: 'Your roadmap', color: 'bg-purple-600/20 text-purple-400 border-purple-500/20' },
+    { label: 'Write Note', icon: StickyNote, path: '/notes', desc: '+5 YC', color: 'bg-amber-600/20 text-amber-400 border-amber-500/20' },
+  ];
+
+  const tasks = [
+    { title: 'Study Unit 1.2: Defining Limits', done: false, type: 'study' },
+    { title: 'Review Chain Rule exercises', done: true, type: 'study' },
+    { title: 'SAT Registration Deadline', done: false, type: 'deadline' },
+    { title: 'Write Physics Lab Report', done: false, type: 'assignment' },
+  ];
+
+  const sessions = [
+    { title: 'Chain Rule Help', agent: 'Teaching', messages: 8 },
+    { title: 'US Application Strategy', agent: 'Planning', messages: 5 },
+    { title: 'Integration by Parts', agent: 'Teaching', messages: 12 },
   ];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Welcome */}
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Welcome back, {user?.name || 'Learner'}! 👋</h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Here's your learning dashboard for today.</p>
+        <p className="text-gray-400 mt-1">Here is your learning dashboard for today.</p>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Zap className="w-5 h-5 text-blue-600" /></div>
-            <div><p className="text-2xl font-bold">{quota.base_remaining}</p><p className="text-xs text-gray-500">AI Chats Left</p></div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center"><Trophy className="w-5 h-5 text-amber-600" /></div>
-            <div><p className="text-2xl font-bold">{balance.balance}</p><p className="text-xs text-gray-500">YC Balance</p></div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-green-600" /></div>
-            <div><p className="text-2xl font-bold">{completedToday}/{tasks.length}</p><p className="text-xs text-gray-500">Tasks Done</p></div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center"><Flame className="w-5 h-5 text-purple-600" /></div>
-            <div><p className="text-2xl font-bold">3</p><p className="text-xs text-gray-500">Day Streak</p></div>
-          </CardContent>
-        </Card>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { icon: Zap, label: 'AI Chats Left', value: '7' },
+          { icon: Trophy, label: 'YC Balance', value: '128' },
+          { icon: CheckCircle2, label: 'Tasks Done', value: '1/4' },
+          { icon: Flame, label: 'Day Streak', value: '3' },
+        ].map(s => (
+          <Card key={s.label} className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center"><s.icon className="w-5 h-5 text-blue-400" /></div>
+            <div><p className="text-2xl font-bold">{s.value}</p><p className="text-xs text-gray-400">{s.label}</p></div>
+          </CardContent></Card>
+        ))}
       </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {quickActions.map(a => (
-          <button key={a.label} onClick={() => navigate(a.path)} className={`flex items-center gap-3 p-4 rounded-xl ${a.color} hover:opacity-80 transition-opacity text-left`}>
-            <a.icon className="w-6 h-6" />
-            <span className="font-medium text-sm">{a.label}</span>
+          <button key={a.label} onClick={() => navigate(a.path)} className={`flex items-center gap-3 p-4 rounded-xl border ${a.color} hover:opacity-80 transition-opacity text-left`}>
+            <a.icon className="w-5 h-5" /><div><p className="font-medium text-sm">{a.label}</p><p className="text-xs opacity-70">{a.desc}</p></div>
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active Courses */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="w-5 h-5" /> My Courses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {activeCourses.map(c => (
-                <div key={c.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="font-medium">{c.full_name}</p>
-                    <p className="text-xs text-gray-500">{c.total_units} units · {c.estimated_hours}h total</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-sm font-medium">Unit 1 of {c.total_units}</p>
-                      <Progress value={10} className="w-24 h-2 mt-1" />
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/learning`)}>Continue</Button>
-                  </div>
-                </div>
-              ))}
-              {activeCourses.length === 0 && <p className="text-gray-500 text-sm">No active courses. Add one to get started!</p>}
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Tasks */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2"><Calendar className="w-5 h-5" /> Today's Tasks</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold flex items-center gap-2"><CalendarDays className="w-4 h-4 text-blue-400" />Today</h3><span className="text-xs text-gray-400">25% done</span></div>
+            <Progress value={25} className="h-1.5 mb-3 bg-white/5" />
             <div className="space-y-2">
-              {pendingTasks.slice(0, 5).map(t => (
-                <div key={t.id} className="flex items-start gap-2 text-sm">
-                  {t.status === 'completed' ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" /> :
-                   t.status === 'in_progress' ? <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5" /> :
-                   <Circle className="w-4 h-4 text-gray-400 mt-0.5" />}
-                  <span className={t.status === 'completed' ? 'line-through text-gray-400' : ''}>{t.title}</span>
+              {tasks.map(t => (
+                <div key={t.title} className="flex items-start gap-2 text-sm">
+                  {t.done ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5" /> : <Circle className="w-4 h-4 text-gray-600 mt-0.5" />}
+                  <span className={t.done ? 'line-through text-gray-500' : 'text-gray-300'}>{t.title}</span>
                 </div>
               ))}
-              {pendingTasks.length === 0 && <p className="text-gray-500 text-sm">All caught up! 🎉</p>}
             </div>
-            <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => navigate('/tasks')}>
-              View All <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+            <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-gray-400 hover:text-white" onClick={() => navigate('/planning')}>View all</Button>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5" /> Recent Chats</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Recent Chats */}
+        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2"><Bot className="w-4 h-4 text-purple-400" />Recent Chats</h3>
             <div className="space-y-2">
-              {sessions.slice(0, 4).map(s => (
-                <button key={s.id} onClick={() => navigate(`/agent/${s.id}`)} className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-left transition-colors">
-                  <div>
-                    <p className="font-medium text-sm">{s.title}</p>
-                    <p className="text-xs text-gray-500">{s.message_count} messages · {s.subject}</p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
+              {sessions.map(s => (
+                <button key={s.title} onClick={() => navigate('/agent')} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors text-left">
+                  <div><p className="text-sm font-medium text-gray-300">{s.title}</p><p className="text-xs text-gray-500">{s.agent} · {s.messages} msgs</p></div>
+                  <TrendingUp className="w-4 h-4 text-gray-600" />
                 </button>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2"><StickyNote className="w-5 h-5" /> My Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Calendar Preview */}
+        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2"><CalendarDays className="w-4 h-4 text-amber-400" />This Week</h3>
             <div className="space-y-2">
-              {myNotes.slice(0, 4).map(n => (
-                <div key={n.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{n.title}</p>
-                    <p className="text-xs text-gray-500">{n.visibility} · {n.heat_score > 0 ? `${n.heat_score} heat` : 'draft'}</p>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day, i) => (
+                <div key={day} className={`flex items-center gap-3 p-2 rounded-lg ${i === 0 ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5'}`}>
+                  <span className="text-xs font-bold text-gray-500 w-8">{day}</span>
+                  <div className="flex-1">
+                    {i === 0 && <p className="text-xs text-blue-300">Chain Rule Study</p>}
+                    {i === 2 && <p className="text-xs text-gray-400">SAT Mock Test</p>}
+                    {i === 4 && <p className="text-xs text-gray-400">IA Draft Due</p>}
+                    {i !== 0 && i !== 2 && i !== 4 && <p className="text-xs text-gray-600">No events</p>}
                   </div>
                 </div>
               ))}
             </div>
-            <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => navigate('/notes')}>
-              All Notes <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+            <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-gray-400 hover:text-white" onClick={() => navigate('/calendar')}>Full calendar</Button>
           </CardContent>
         </Card>
       </div>

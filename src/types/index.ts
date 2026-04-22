@@ -1,40 +1,39 @@
 // ============================================================
-// Yhea Core Types
+// Yhea v2.0 - Complete Type Definitions
 // ============================================================
 
+// --- Auth & User ---
 export interface User {
   id: string;
   email: string;
   name: string;
   avatar_url?: string;
+  bio?: string;
+  tags?: string[];
   role: 'student' | 'admin';
   created_at: string;
 }
 
-export interface StudentProfile {
+export interface Profile {
   id: string;
   user_id: string;
   curriculum: 'AP' | 'A-Level' | 'IB';
   year: number;
-  subjects: Subject[];
+  subjects: string[];
   target_universities: string[];
   target_scores: Record<string, number>;
   learning_style?: string;
+  language_tests: string[];
+  language_target_scores: Record<string, number>;
+  standardized_tests: string[];
+  standardized_target_scores: Record<string, number>;
+  target_countries: string[];
   timezone: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface Subject {
-  code: string;
-  name: string;
-  level?: string;
-}
-
-// ============================================================
-// M1: Learning Engine
-// ============================================================
-
+// --- Learning: Subject Courses ---
 export interface Course {
   id: string;
   curriculum: 'AP' | 'A-Level' | 'IB';
@@ -80,53 +79,58 @@ export interface KnowledgeNode {
   estimated_minutes?: number;
 }
 
-export interface Exercise {
+// --- Learning: Standardized Tests ---
+export interface StandardizedTest {
   id: string;
-  course_id: string;
-  unit_id: string;
-  node_ids: string[];
-  question_text: string;
-  question_type: 'mcq' | 'frq' | 'structured' | 'essay' | 'calculation';
-  options?: Array<{ label: string; text: string; is_correct?: boolean }>;
-  solution?: string;
-  mark_scheme?: Array<{ point: string; marks: number }>;
-  difficulty?: number;
-  year?: number;
-  exam_session?: string;
-  paper_reference?: string;
-  question_number?: string;
-  source?: string;
-  is_past_paper: boolean;
+  code: string;
+  name: string;
+  category: 'language' | 'academic';
+  description: string;
+  max_score: string;
+  duration: string;
+  sections: TestSection[];
+  registration_url?: string;
+  is_active: boolean;
 }
 
-export interface StudentProgress {
+export interface TestSection {
   id: string;
-  student_id: string;
-  node_id: string;
-  understanding_level: number;
-  application_level: number;
-  analysis_level: number;
-  status: 'not_started' | 'learning' | 'practicing' | 'mastered' | 'needs_review';
-  times_studied: number;
-  times_exercised: number;
-  times_correct: number;
-  total_attempts: number;
-  last_studied_at?: string;
+  test_id: string;
+  name: string;
+  description: string;
+  question_count?: string;
+  duration: string;
+  score_range: string;
+  order_index: number;
+}
+
+// --- Flashcards ---
+export interface FlashcardDeck {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  category: string;
+  course_id?: string;
+  test_id?: string;
+  is_public: boolean;
+  card_count: number;
+  created_at: string;
+}
+
+export interface Flashcard {
+  id: string;
+  deck_id: string;
+  front: string;
+  back: string;
+  tags: string[];
+  difficulty: number;
+  review_count: number;
   next_review_at?: string;
+  created_at: string;
 }
 
-export interface LearningPathItem {
-  unit: string;
-  node: KnowledgeNode;
-  reason: string;
-  estimated_minutes: number;
-  recommended_exercises: number;
-}
-
-// ============================================================
-// M2: Planning + Universities + Application Guide
-// ============================================================
-
+// --- Universities ---
 export interface University {
   id: string;
   name: string;
@@ -134,15 +138,14 @@ export interface University {
   country: string;
   region?: string;
   type?: 'public' | 'private';
-  ranking_us_news?: number;
   ranking_qs?: number;
+  ranking_us_news?: number;
   ranking_the?: number;
   website?: string;
   logo_url?: string;
   description?: string;
   campus_info?: string;
   tuition_range?: string;
-  acceptance_rate?: number;
   student_population?: number;
   is_active: boolean;
 }
@@ -156,71 +159,98 @@ export interface UniversityMajor {
   description?: string;
   degree_type?: string;
   duration_years?: number;
-  tuition_per_year?: string;
   requirements?: string;
   career_paths?: string[];
   is_active: boolean;
 }
 
-export interface AdmissionStat {
+export interface UniversityRanking {
   id: string;
   university_id: string;
-  major_id?: string;
-  year: number;
-  data_type: 'overall' | 'by_curriculum';
-  curriculum?: string;
-  total_applicants?: number;
-  total_admitted?: number;
-  total_enrolled?: number;
-  admit_rate?: number;
-  avg_ib_score?: number;
-  min_ib_score?: number;
-  avg_ap_count?: number;
-  avg_ap_score?: number;
-  sat_mid_50?: { low: number; high: number };
-  source: string;
-  confidence: 'high' | 'medium' | 'low';
-}
-
-export interface ApplicationDeadline {
-  id: string;
-  university_id: string;
-  admission_plan: string;
-  deadline_type: string;
-  deadline_date: string;
-  requirements?: Record<string, unknown>;
+  ranking_name: 'QS' | 'US News' | 'THE';
+  subject_category: string;
+  subject_subcategory?: string;
+  rank?: number;
   year: number;
 }
 
-export interface ApplicationGuide {
+// --- Apply Guide & Essays ---
+export interface ApplicationSystem {
   id: string;
+  name: string;
   country: string;
-  university_id?: string;
-  title: string;
-  content: string;
-  section: string;
-  order_index: number;
+  description: string;
+  essay_count: number;
+  essay_prompts: Array<{ prompt: string; word_limit: number; required: boolean }>;
+  deadline_regular?: string;
+  deadline_early?: string;
+  website?: string;
   is_active: boolean;
 }
 
-export interface StudentUniversityTarget {
+export interface Essay {
   id: string;
-  student_id: string;
-  university_id: string;
-  major_id?: string;
-  category: 'reach' | 'match' | 'safety';
-  preference_rank?: number;
-  status: string;
-  notes?: string;
+  user_id: string;
+  application_system_id?: string;
+  university_id?: string;
+  prompt?: string;
+  title: string;
+  content: string;
+  word_count: number;
+  status: 'draft' | 'reviewing' | 'final';
+  ai_feedback?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-// ============================================================
-// M3: Agent
-// ============================================================
+// --- Background (Competitions & Projects) ---
+export interface Competition {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  description: string;
+  eligibility: string;
+  timeline: string;
+  website?: string;
+  scoring_difficulty: number;
+  scoring_commitment: number;
+  scoring_prestige: number;
+  scoring_quality: number;
+  scoring_experience: number;
+  yhea_score: number;
+  is_active: boolean;
+}
+
+export interface BackgroundProject {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  status: 'planning' | 'in_progress' | 'completed';
+  start_date?: string;
+  end_date?: string;
+  skills: string[];
+  links?: string[];
+  is_public: boolean;
+  created_at: string;
+}
+
+// --- Agents ---
+export interface AgentConfig {
+  id: string;
+  agent_type: 'planning' | 'teaching' | 'schedule' | 'mental';
+  name: string;
+  description: string;
+  system_prompt: string;
+  icon: string;
+  is_active: boolean;
+}
 
 export interface ChatSession {
   id: string;
   student_id: string;
+  agent_type: string;
   title?: string;
   subject?: string;
   status: 'active' | 'archived';
@@ -234,35 +264,12 @@ export interface ChatMessage {
   session_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  tool_calls?: Array<{
-    name: string;
-    params: Record<string, unknown>;
-    result?: Record<string, unknown>;
-    latency_ms?: number;
-  }>;
-  rag_sources?: Array<{
-    node_id: string;
-    title: string;
-    content_snippet: string;
-    similarity: number;
-  }>;
+  tool_calls?: any[];
+  rag_sources?: any[];
   created_at: string;
 }
 
-export interface AgentMemory {
-  id: string;
-  student_id: string;
-  memory_type: 'weak_point' | 'strong_point' | 'learning_style' | 'goal' | 'event' | 'preference' | 'emotion';
-  content: string;
-  confidence: number;
-  frequency: number;
-  last_seen_at: string;
-}
-
-// ============================================================
-// M4: Notes
-// ============================================================
-
+// --- Notes & Plaza ---
 export interface Note {
   id: string;
   author_id: string;
@@ -285,38 +292,15 @@ export interface Note {
   created_at: string;
   updated_at: string;
   published_at?: string;
-  author?: User;
+  author?: { id: string; email?: string; name: string; avatar_url?: string; role?: string; created_at?: string };
 }
 
-export interface NoteInteraction {
-  id: string;
-  note_id: string;
-  user_id: string;
-  type: 'like' | 'bookmark' | 'comment';
-  comment_text?: string;
-  created_at: string;
-}
-
-// ============================================================
-// M5: Credits / Points
-// ============================================================
-
+// --- Points & AI Quota ---
 export interface PointBalance {
   user_id: string;
   balance: number;
   lifetime_earned: number;
   lifetime_spent: number;
-}
-
-export interface PointTransaction {
-  id: string;
-  user_id: string;
-  type: 'earn' | 'spend' | 'refund' | 'penalty';
-  amount: number;
-  source: string;
-  source_id?: string;
-  description: string;
-  created_at: string;
 }
 
 export interface AIUsageQuota {
@@ -331,49 +315,86 @@ export interface AIUsageQuota {
   new_user_bonus: number;
 }
 
-// ============================================================
-// M6: Tasks
-// ============================================================
-
+// --- Tasks & Calendar ---
 export interface Task {
   id: string;
   user_id: string;
-  source: 'manual' | 'agent' | 'learning_engine' | 'planning_center' | 'system';
-  source_id?: string;
+  source: string;
   title: string;
   description?: string;
-  type: 'study' | 'assignment' | 'exam' | 'application_deadline' | 'reminder';
+  type: string;
   course_id?: string;
   node_id?: string;
   due_date?: string;
-  due_time?: string;
   estimated_minutes?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
-  priority: 1 | 2 | 3;
+  status: string;
+  priority: number;
   completed_at?: string;
-  remind_at?: string;
   created_at: string;
 }
 
-export interface FocusSession {
+export interface CalendarEvent {
   id: string;
   user_id: string;
-  task_id?: string;
-  started_at: string;
-  ended_at?: string;
-  planned_duration: number;
-  actual_duration?: number;
-  was_completed: boolean;
-  interruption_reason?: string;
-  subject?: string;
-  notes?: string;
-  points_earned: number;
+  title: string;
+  description?: string;
+  event_type: string;
+  start_time: string;
+  end_time?: string;
+  color?: string;
+  related_task_id?: string;
+  created_at: string;
 }
 
-// ============================================================
-// Activity Log (M7 Data)
-// ============================================================
+// --- People (Social) ---
+export interface Friend {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  status: 'pending' | 'accepted';
+  created_at: string;
+}
 
+export interface ChatGroup {
+  id: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  created_by: string;
+  member_count: number;
+  created_at: string;
+}
+
+export interface SocialMessage {
+  id: string;
+  sender_id: string;
+  receiver_id?: string;
+  group_id?: string;
+  content: string;
+  created_at: string;
+}
+
+// --- Meeting ---
+export interface Meeting {
+  id: string;
+  host_id: string;
+  title: string;
+  description?: string;
+  meeting_type: 'class' | 'group' | 'world';
+  meeting_url: string;
+  meeting_id?: string;
+  password?: string;
+  platform: 'zoom' | 'teams' | 'google_meet' | 'other';
+  scheduled_at?: string;
+  duration_minutes?: number;
+  max_participants?: number;
+  course_id?: string;
+  group_id?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+// --- Admin ---
 export interface ActivityLog {
   id: string;
   user_id: string;
@@ -381,15 +402,4 @@ export interface ActivityLog {
   source_module: string;
   metadata?: Record<string, unknown>;
   created_at: string;
-}
-
-export interface WeeklyReport {
-  user_id: string;
-  week: string;
-  study_sessions: number;
-  agent_interactions: number;
-  exercises_done: number;
-  focus_sessions: number;
-  notes_created: number;
-  total_focus_minutes: number;
 }

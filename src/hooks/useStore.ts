@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Course, University, Note, Task, PointBalance, AIUsageQuota } from '@/types';
-import { seedCourses, seedUniversities, seedMajors, seedUnits, seedNodes, seedApplicationGuides } from '@/lib/seed-data';
+import { seedCourses, seedUniversities, seedMajors, seedUnits, seedNodes } from '@/lib/seed-data';
 
 export function useCourses() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -39,11 +39,7 @@ export function useUniversities() {
     return seedMajors.filter(m => m.university_id === uniId);
   }, []);
 
-  const getGuides = useCallback((country: string) => {
-    return seedApplicationGuides.filter(g => g.country === country);
-  }, []);
-
-  return { universities, loading, getMajors, getGuides };
+  return { universities, loading, getMajors };
 }
 
 export function useNotes() {
