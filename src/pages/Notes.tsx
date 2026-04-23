@@ -1,80 +1,198 @@
-import { useState } from 'react';
-import { StickyNote, Plus, Search, Lock, Eye, Clock, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  StickyNote, Plus, Save, Trash2, Eye, EyeOff, X, Bookmark, Heart, MessageSquare
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const demoNotes = [
-  { id: 'n1', title: 'AP Calc BC: Chain Rule Summary', content: 'The Chain Rule is crucial for differentiating composite functions. Think of it like peeling an onion...', visibility: 'published' as const, heat: 120, likes: 15, comments: 4, date: '2026-04-15', tags: ['calculus', 'chain-rule'] },
-  { id: 'n2', title: 'Integration by Parts: My Method', content: 'LIATE rule for choosing u and dv...', visibility: 'published' as const, heat: 85, likes: 12, comments: 3, date: '2026-04-16', tags: ['integration', 'by-parts'] },
-  { id: 'n3', title: 'US vs UK Application Guide', content: 'US: holistic, essays matter. UK: academic focus...', visibility: 'published' as const, heat: 200, likes: 28, comments: 7, date: '2026-04-17', tags: ['application', 'comparison'] },
-  { id: 'n4', title: 'Personal Draft - Physics IA', content: 'This is my private draft for the physics internal assessment...', visibility: 'private' as const, heat: 0, likes: 0, comments: 0, date: '2026-04-18', tags: ['physics', 'IA'] },
-];
-
 export default function Notes() {
-  const [search, setSearch] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
-  const [newVis, setNewVis] = useState<'private' | 'published'>('private');
+  const { user } = useAuth();
+  const [myNotes, setMyNotes] = useState<any[]>([]);
+  const [publishedNotes, setPublishedNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('my');
 
-  const filtered = demoNotes.filter(n => !search || n.title.toLowerCase().includes(search.toLowerCase()));
+  // Create/Edit state
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [visibility, setVisibility] = useState<'private' | 'published'>('private');
+  const [tags, setTags] = useState('');
 
-  const handleCreate = () => {
-    if (!newTitle.trim()) return;
-    demoNotes.unshift({ id: `n${Date.now()}`, title: newTitle, content: newContent, visibility: newVis, heat: 0, likes: 0, comments: 0, date: new Date().toISOString().slice(0, 10), tags: [] });
-    setNewTitle(''); setNewContent(''); setShowCreate(false);
+  const fetchNotes = async () => {
+    if (!user) return;
+    setLoading(true);
+    // My notes
+    const { data: my } = await supabase.from('notes').select('*').eq('author_id', user.id).order('updated_at', { ascending: false });
+    setMyNotes(my || []);
+    // Published notes (Plaza)
+    const { data: pub } = await supabase.from('notes').select('*, author:users(name, avatar_url)').eq('visibility', 'published').order('heat_score', { ascending: false }).limit(20);
+    setPublishedNotes(pub || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchNotes(); }, [user]);
+
+  const handleSave = async () => {
+    if (!user || !title.trim()) return;
+    const payload = {
+      author_id: user.id,
+      title: title.trim(),
+      content_text: content.trim(),
+      content_json: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: content }] }] },
+      visibility,
+      topic_tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      source_type: 'manual',
+    };
+
+    if (editingId) {
+      await supabase.from('notes').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editingId);
+    } else {
+      await supabase.from('notes').insert({ ...payload, heat_score: 0, likes_count: 0, comments_count: 0, bookmarks_count: 0, views_count: 0 });
+    }
+    setShowEditor(false); setEditingId(null); resetForm(); fetchNotes();
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('notes').delete().eq('id', id);
+    fetchNotes();
+  };
+
+  const handleToggleVisibility = async (id: string, current: string) => {
+    const next = current === 'published' ? 'private' : 'published';
+    const updates: any = { visibility: next };
+    if (next === 'published') updates.published_at = new Date().toISOString();
+    await supabase.from('notes').update(updates).eq('id', id);
+    fetchNotes();
+  };
+
+  const handleInteract = async (noteId: string, type: 'like' | 'bookmark') => {
+    if (!user) return;
+    // Check if already interacted
+    const { data: existing } = await supabase.from('note_interactions').select('id').eq('note_id', noteId).eq('user_id', user.id).eq('type', type).single();
+    if (existing) {
+      await supabase.from('note_interactions').delete().eq('id', existing.id);
+    } else {
+      await supabase.from('note_interactions').insert({ note_id: noteId, user_id: user.id, type });
+    }
+    fetchNotes();
+  };
+
+  const resetForm = () => { setTitle(''); setContent(''); setVisibility('private'); setTags(''); };
+
+  const openEditor = (note?: any) => {
+    if (note) { setEditingId(note.id); setTitle(note.title); setContent(note.content_text || ''); setVisibility(note.visibility); setTags((note.topic_tags || []).join(', ')); }
+    else { resetForm(); setEditingId(null); }
+    setShowEditor(true);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-2xl font-bold flex items-center gap-2"><StickyNote className="w-6 h-6 text-emerald-400" />Notes</h2><p className="text-gray-400 mt-1">Your personal knowledge library. Publish to earn credits!</p></div>
-        <Button className="bg-emerald-600" onClick={() => setShowCreate(!showCreate)}><Plus className="w-4 h-4 mr-1" />New Note</Button>
+        <div><h2 className="text-2xl font-bold flex items-center gap-2"><StickyNote className="w-6 h-6 text-purple-400" />Notes</h2><p className="text-gray-400 mt-1">Write, publish, and earn points</p></div>
+        <Button className="bg-purple-600" onClick={() => openEditor()}><Plus className="w-4 h-4 mr-1" />New Note</Button>
       </div>
 
-      {showCreate && (
-        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-5 space-y-3">
-          <Input placeholder="Note title..." value={newTitle} onChange={e => setNewTitle(e.target.value)} className="bg-[#0f172a] border-white/10" />
-          <Textarea placeholder="Write your note... (LaTeX supported with $...$)" value={newContent} onChange={e => setNewContent(e.target.value)} rows={6} className="bg-[#0f172a] border-white/10" />
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <button onClick={() => setNewVis('private')} className={`px-3 py-1.5 rounded-lg text-sm ${newVis === 'private' ? 'bg-blue-600/20 text-blue-400' : 'bg-[#0f172a] text-gray-400'}`}><Lock className="w-3.5 h-3.5 inline mr-1" />Private</button>
-              <button onClick={() => setNewVis('published')} className={`px-3 py-1.5 rounded-lg text-sm ${newVis === 'published' ? 'bg-green-600/20 text-green-400' : 'bg-[#0f172a] text-gray-400'}`}><Eye className="w-3.5 h-3.5 inline mr-1" />Publish (+5 YC)</button>
-            </div>
-            <div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button><Button size="sm" className="bg-emerald-600" onClick={handleCreate}>Save</Button></div>
-          </div>
-        </CardContent></Card>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-[#1e293b] border border-white/10">
+          <TabsTrigger value="my">My Notes ({myNotes.length})</TabsTrigger>
+          <TabsTrigger value="plaza">Plaza ({publishedNotes.length})</TabsTrigger>
+        </TabsList>
 
-      <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-gray-500" /><Input placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-[#1e293b] border-white/10" /></div>
-
-      <Tabs defaultValue="all">
-        <TabsList className="bg-[#1e293b] border border-white/10"><TabsTrigger value="all">All</TabsTrigger><TabsTrigger value="private">Private</TabsTrigger><TabsTrigger value="published">Published</TabsTrigger></TabsList>
-        <TabsContent value="all" className="mt-4 space-y-3">
-          {filtered.map(n => (
-            <Card key={n.id} className="bg-[#1e293b] border-white/10"><CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold">{n.title}</h3>
-                    {n.visibility === 'published' ? <Badge className="bg-green-500/20 text-green-400 text-xs"><Eye className="w-3 h-3 mr-1" />Public</Badge> : <Badge variant="secondary" className="text-xs"><Lock className="w-3 h-3 mr-1" />Private</Badge>}
-                  </div>
-                  <p className="text-sm text-gray-500 line-clamp-2">{n.content}</p>
-                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{n.date}</span>
-                    {n.heat > 0 && <span className="text-amber-400 flex items-center gap-1"><Sparkles className="w-3 h-3" />{n.heat} heat</span>}
-                    <div className="flex gap-1">{n.tags.map(t => <Badge key={t} variant="outline" className="text-[10px] border-white/10">{t}</Badge>)}</div>
-                  </div>
-                </div>
-              </div>
+        <TabsContent value="my" className="mt-4">
+          {loading ? <p className="text-gray-500">Loading...</p> : myNotes.length === 0 ? (
+            <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-8 text-center text-gray-500">
+              <StickyNote className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>No notes yet. Start writing!</p>
+              <Button size="sm" className="mt-3 bg-purple-600" onClick={() => openEditor()}><Plus className="w-4 h-4 mr-1" />Create Note</Button>
             </CardContent></Card>
-          ))}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {myNotes.map(n => (
+                <Card key={n.id} className="bg-[#1e293b] border-white/10 hover:border-purple-500/30 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditor(n)}>
+                        <p className="font-medium truncate">{n.title}</p>
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{n.content_text?.slice(0, 100) || 'No content'}</p>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <button onClick={() => handleToggleVisibility(n.id, n.visibility)} className="p-1 hover:bg-white/5 rounded">
+                          {n.visibility === 'published' ? <Eye className="w-4 h-4 text-emerald-400" /> : <EyeOff className="w-4 h-4 text-gray-500" />}
+                        </button>
+                        <button onClick={() => handleDelete(n.id)} className="p-1 hover:bg-white/5 rounded text-red-400"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-[10px]">{n.visibility}</Badge>
+                      {n.topic_tags?.map((t: string) => <Badge key={t} className="text-[10px] bg-purple-500/10 text-purple-400">{t}</Badge>)}
+                      <span className="text-xs text-gray-500 ml-auto">{n.heat_score || 0} pts</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="plaza" className="mt-4">
+          {publishedNotes.length === 0 ? (
+            <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-8 text-center text-gray-500">
+              <Heart className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>No published notes yet. Be the first!</p>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-3">
+              {publishedNotes.map(n => (
+                <Card key={n.id} className="bg-[#1e293b] border-white/10 hover:border-purple-500/30 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold flex-shrink-0">{(n.author?.name || 'Y')[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{n.title}</p>
+                        <p className="text-sm text-gray-400 mt-1 line-clamp-3">{n.content_text?.slice(0, 200)}</p>
+                        <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                          <button onClick={() => handleInteract(n.id, 'like')} className="flex items-center gap-1 hover:text-red-400 transition-colors"><Heart className="w-3.5 h-3.5" />{n.likes_count || 0}</button>
+                          <button onClick={() => handleInteract(n.id, 'bookmark')} className="flex items-center gap-1 hover:text-amber-400 transition-colors"><Bookmark className="w-3.5 h-3.5" />{n.bookmarks_count || 0}</button>
+                          <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" />{n.comments_count || 0}</span>
+                          <span className="ml-auto text-amber-400 font-medium">{n.heat_score || 0} pts</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
+
+      {/* Editor Dialog */}
+      <Dialog open={showEditor} onOpenChange={setShowEditor}>
+        <DialogContent className="bg-[#1e293b] border-white/10 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editingId ? 'Edit Note' : 'New Note'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <Textarea placeholder="Write your note here... (supports markdown)" value={content} onChange={e => setContent(e.target.value)} className="bg-[#0f172a] border-white/10 min-h-[200px]" />
+            <Input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-400">Visibility:</span>
+              <button onClick={() => setVisibility('private')} className={`px-3 py-1 rounded-lg text-xs ${visibility === 'private' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500'}`}>Private</button>
+              <button onClick={() => setVisibility('published')} className={`px-3 py-1 rounded-lg text-xs ${visibility === 'published' ? 'bg-emerald-600/20 text-emerald-400' : 'text-gray-500'}`}>Publish</button>
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1 bg-purple-600" onClick={handleSave} disabled={!title.trim()}><Save className="w-4 h-4 mr-1" />{editingId ? 'Update' : 'Save'}</Button>
+              <Button variant="outline" className="border-white/10" onClick={() => { setShowEditor(false); resetForm(); }}><X className="w-4 h-4" /></Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

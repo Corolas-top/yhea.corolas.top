@@ -1,6 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { Bot, BookOpen, Target, StickyNote, Trophy, Zap, CalendarDays, CheckCircle2, Circle, Flame, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, Target, CalendarDays, StickyNote, Trophy, Zap, BookOpen, CheckCircle2, Clock
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -8,112 +12,195 @@ import { Progress } from '@/components/ui/progress';
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [points, setPoints] = useState<any>(null);
+  const [quota, setQuota] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const quickActions = [
-    { label: 'Ask Agent', icon: Bot, path: '/agent', desc: 'Get help from AI', color: 'bg-blue-600/20 text-blue-400 border-blue-500/20' },
-    { label: 'Continue Learning', icon: BookOpen, path: '/learning', desc: 'Your courses', color: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/20' },
-    { label: 'Check Plan', icon: Target, path: '/planning', desc: 'Your roadmap', color: 'bg-purple-600/20 text-purple-400 border-purple-500/20' },
-    { label: 'Write Note', icon: StickyNote, path: '/notes', desc: '+5 YC', color: 'bg-amber-600/20 text-amber-400 border-amber-500/20' },
-  ];
+  useEffect(() => {
+    if (!user) return;
+    fetchDashboardData();
+  }, [user]);
 
-  const tasks = [
-    { title: 'Study Unit 1.2: Defining Limits', done: false, type: 'study' },
-    { title: 'Review Chain Rule exercises', done: true, type: 'study' },
-    { title: 'SAT Registration Deadline', done: false, type: 'deadline' },
-    { title: 'Write Physics Lab Report', done: false, type: 'assignment' },
-  ];
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    const uid = user!.id;
 
-  const sessions = [
-    { title: 'Chain Rule Help', agent: 'Teaching', messages: 8 },
-    { title: 'US Application Strategy', agent: 'Planning', messages: 5 },
-    { title: 'Integration by Parts', agent: 'Teaching', messages: 12 },
-  ];
+    // Fetch tasks (pending + in_progress only)
+    const { data: tData } = await supabase
+      .from('tasks').select('*')
+      .eq('user_id', uid)
+      .in('status', ['pending', 'in_progress'])
+      .order('due_date', { ascending: true })
+      .limit(5);
+    setTasks(tData || []);
+
+    // Fetch upcoming calendar events
+    const today = new Date().toISOString();
+    const { data: eData } = await supabase
+      .from('calendar_events').select('*')
+      .eq('user_id', uid)
+      .gte('start_at', today)
+      .order('start_at', { ascending: true })
+      .limit(5);
+    setEvents(eData || []);
+
+    // Fetch my notes
+    const { data: nData } = await supabase
+      .from('notes').select('*')
+      .eq('author_id', uid)
+      .order('updated_at', { ascending: false })
+      .limit(4);
+    setNotes(nData || []);
+
+    // Fetch points
+    const { data: pData } = await supabase
+      .from('point_balances').select('*')
+      .eq('user_id', uid).single();
+    setPoints(pData);
+
+    // Fetch AI quota
+    const { data: qData } = await supabase
+      .from('ai_usage_quotas').select('*')
+      .eq('user_id', uid).single();
+    setQuota(qData);
+
+    // Fetch profile
+    const { data: profData } = await supabase
+      .from('student_profiles').select('*')
+      .eq('user_id', uid).single();
+    setProfile(profData);
+
+    setLoading(false);
+  };
+
+  const toggleTask = async (taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+  };
+
+  const aiUsed = quota ? (quota.base_daily_limit + quota.bonus_from_points - quota.base_remaining - quota.bonus_remaining) : 0;
+  const aiTotal = quota ? (quota.base_daily_limit + quota.bonus_from_points) : 10;
 
   return (
     <div className="space-y-6">
+      {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold">Welcome back, {user?.name || 'Learner'}! 👋</h2>
-        <p className="text-gray-400 mt-1">Here is your learning dashboard for today.</p>
+        <h2 className="text-2xl font-bold flex items-center gap-2"><LayoutDashboard className="w-6 h-6 text-blue-400" />Dashboard</h2>
+        <p className="text-gray-400 mt-1">
+          {loading ? 'Loading...' : profile ? `${profile.curriculum} Year ${profile.year} \u00b7 Welcome back, ${user?.name}!` : `Welcome, ${user?.name}!`}
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { icon: Zap, label: 'AI Chats Left', value: '7' },
-          { icon: Trophy, label: 'YC Balance', value: '128' },
-          { icon: CheckCircle2, label: 'Tasks Done', value: '1/4' },
-          { icon: Flame, label: 'Day Streak', value: '3' },
-        ].map(s => (
-          <Card key={s.label} className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center"><s.icon className="w-5 h-5 text-blue-400" /></div>
-            <div><p className="text-2xl font-bold">{s.value}</p><p className="text-xs text-gray-400">{s.label}</p></div>
-          </CardContent></Card>
-        ))}
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center"><Target className="w-5 h-5 text-blue-400" /></div>
+          <div><p className="text-lg font-bold">{tasks.length}</p><p className="text-xs text-gray-500">Active Tasks</p></div>
+        </CardContent></Card>
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center"><StickyNote className="w-5 h-5 text-purple-400" /></div>
+          <div><p className="text-lg font-bold">{notes.length}</p><p className="text-xs text-gray-500">My Notes</p></div>
+        </CardContent></Card>
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center"><Trophy className="w-5 h-5 text-amber-400" /></div>
+          <div><p className="text-lg font-bold">{points?.balance || 0}</p><p className="text-xs text-gray-500">YC Points</p></div>
+        </CardContent></Card>
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><Zap className="w-5 h-5 text-emerald-400" /></div>
+          <div><p className="text-lg font-bold">{aiTotal - aiUsed}/{aiTotal}</p><p className="text-xs text-gray-500">AI Left</p></div>
+        </CardContent></Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {quickActions.map(a => (
-          <button key={a.label} onClick={() => navigate(a.path)} className={`flex items-center gap-3 p-4 rounded-xl border ${a.color} hover:opacity-80 transition-opacity text-left`}>
-            <a.icon className="w-5 h-5" /><div><p className="font-medium text-sm">{a.label}</p><p className="text-xs opacity-70">{a.desc}</p></div>
-          </button>
-        ))}
-      </div>
+      {/* AI Usage Progress */}
+      <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium flex items-center gap-2"><Zap className="w-4 h-4 text-emerald-400" />Daily AI Usage</p>
+          <span className="text-xs text-gray-500">{Math.round((aiUsed / aiTotal) * 100)}% used</span>
+        </div>
+        <Progress value={(aiUsed / aiTotal) * 100} className="h-2" />
+      </CardContent></Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tasks */}
-        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold flex items-center gap-2"><CalendarDays className="w-4 h-4 text-blue-400" />Today</h3><span className="text-xs text-gray-400">25% done</span></div>
-            <Progress value={25} className="h-1.5 mb-3 bg-white/5" />
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold flex items-center gap-2"><Target className="w-4 h-4 text-blue-400" />Upcoming Tasks</h3>
+            <Button variant="ghost" size="sm" className="text-xs text-blue-400" onClick={() => navigate('/planning')}>View All</Button>
+          </div>
+          {tasks.length === 0 ? (
+            <div className="text-center py-6 text-gray-500 text-sm">
+              <p>No tasks yet. Create one in Planning!</p>
+            </div>
+          ) : (
             <div className="space-y-2">
               {tasks.map(t => (
-                <div key={t.title} className="flex items-start gap-2 text-sm">
-                  {t.done ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5" /> : <Circle className="w-4 h-4 text-gray-600 mt-0.5" />}
-                  <span className={t.done ? 'line-through text-gray-500' : 'text-gray-300'}>{t.title}</span>
+                <div key={t.id} className="flex items-center gap-3 p-3 bg-[#0f172a] rounded-lg hover:bg-[#0f172a]/80 transition-colors">
+                  <button onClick={() => toggleTask(t.id, t.status)}>
+                    <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${t.status === 'completed' ? 'text-emerald-400' : 'text-gray-600 hover:text-emerald-400'}`} />
+                  </button>
+                  <div className="flex-1 min-w-0"><p className={`text-sm font-medium truncate ${t.status === 'completed' ? 'line-through text-gray-500' : ''}`}>{t.title}</p>
+                    {t.due_date && <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(t.due_date).toLocaleDateString()}</p>}</div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${t.priority === 1 ? 'bg-red-500/10 text-red-400' : t.priority === 2 ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400'}`}>P{t.priority}</span>
                 </div>
               ))}
             </div>
-            <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-gray-400 hover:text-white" onClick={() => navigate('/planning')}>View all</Button>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent></Card>
 
-        {/* Recent Chats */}
-        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
-          <CardContent className="p-4">
-            <h3 className="font-semibold mb-3 flex items-center gap-2"><Bot className="w-4 h-4 text-purple-400" />Recent Chats</h3>
-            <div className="space-y-2">
-              {sessions.map(s => (
-                <button key={s.title} onClick={() => navigate('/agent')} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors text-left">
-                  <div><p className="text-sm font-medium text-gray-300">{s.title}</p><p className="text-xs text-gray-500">{s.agent} · {s.messages} msgs</p></div>
-                  <TrendingUp className="w-4 h-4 text-gray-600" />
-                </button>
-              ))}
+        {/* Calendar Events */}
+        <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold flex items-center gap-2"><CalendarDays className="w-4 h-4 text-purple-400" />Upcoming Events</h3>
+            <Button variant="ghost" size="sm" className="text-xs text-blue-400" onClick={() => navigate('/calendar')}>View All</Button>
+          </div>
+          {events.length === 0 ? (
+            <div className="text-center py-6 text-gray-500 text-sm">
+              <p>No upcoming events. Add one in Calendar!</p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Calendar Preview */}
-        <Card className="bg-[#1e293b] border-white/10 lg:col-span-1">
-          <CardContent className="p-4">
-            <h3 className="font-semibold mb-3 flex items-center gap-2"><CalendarDays className="w-4 h-4 text-amber-400" />This Week</h3>
+          ) : (
             <div className="space-y-2">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day, i) => (
-                <div key={day} className={`flex items-center gap-3 p-2 rounded-lg ${i === 0 ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-white/5'}`}>
-                  <span className="text-xs font-bold text-gray-500 w-8">{day}</span>
-                  <div className="flex-1">
-                    {i === 0 && <p className="text-xs text-blue-300">Chain Rule Study</p>}
-                    {i === 2 && <p className="text-xs text-gray-400">SAT Mock Test</p>}
-                    {i === 4 && <p className="text-xs text-gray-400">IA Draft Due</p>}
-                    {i !== 0 && i !== 2 && i !== 4 && <p className="text-xs text-gray-600">No events</p>}
+              {events.map(e => (
+                <div key={e.id} className="flex items-center gap-3 p-3 bg-[#0f172a] rounded-lg">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${e.event_type === 'deadline' ? 'bg-red-500/10' : e.event_type === 'exam' ? 'bg-purple-500/10' : 'bg-blue-500/10'}`}>
+                    {e.event_type === 'deadline' ? <Target className="w-5 h-5 text-red-400" /> : e.event_type === 'exam' ? <BookOpen className="w-5 h-5 text-purple-400" /> : <CalendarDays className="w-5 h-5 text-blue-400" />}
                   </div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{e.title}</p>
+                    <p className="text-xs text-gray-500">{new Date(e.start_at).toLocaleDateString()} {e.all_day ? '' : new Date(e.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-400">{e.event_type}</span>
                 </div>
               ))}
             </div>
-            <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-gray-400 hover:text-white" onClick={() => navigate('/calendar')}>Full calendar</Button>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent></Card>
       </div>
+
+      {/* Recent Notes */}
+      <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold flex items-center gap-2"><StickyNote className="w-4 h-4 text-purple-400" />Recent Notes</h3>
+          <Button variant="ghost" size="sm" className="text-xs text-blue-400" onClick={() => navigate('/notes')}>View All</Button>
+        </div>
+        {notes.length === 0 ? (
+          <div className="text-center py-6 text-gray-500 text-sm">
+            <p>No notes yet. Start writing!</p>
+            <Button size="sm" className="mt-2 bg-purple-600" onClick={() => navigate('/notes')}><StickyNote className="w-4 h-4 mr-1" />New Note</Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {notes.map(n => (
+              <div key={n.id} className="p-4 bg-[#0f172a] rounded-lg hover:bg-[#0f172a]/80 transition-colors cursor-pointer" onClick={() => navigate('/notes')}>
+                <p className="text-sm font-medium truncate">{n.title}</p>
+                <p className="text-xs text-gray-500 mt-1">{n.visibility} \u00b7 {n.heat_score || 0} pts</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent></Card>
     </div>
   );
 }

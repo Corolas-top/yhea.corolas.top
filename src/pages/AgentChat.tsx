@@ -1,37 +1,97 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { Send, Sparkles, Brain, GraduationCap, Calendar, Loader2, Bookmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const AGENT_CONFIGS: Record<string, { name: string; icon: any; color: string; greeting: string }> = {
-  planning: { name: 'College Planning Agent', icon: GraduationCap, color: 'text-blue-400', greeting: "Hi! I'm your College Planning Agent. Tell me about your dream schools, current scores, and goals - I'll build a personalized roadmap for you!" },
-  teaching: { name: 'Teaching Agent', icon: Sparkles, color: 'text-emerald-400', greeting: "Hey! I'm your Teaching Agent. Ask me anything about your subjects - I'll explain concepts, walk through problems, and cite official sources!" },
-  schedule: { name: 'Schedule Agent', icon: Calendar, color: 'text-amber-400', greeting: "Hello! I'm your Schedule Agent. I'll help you track deadlines, plan your study schedule, and sync everything to your calendar!" },
-  mental: { name: 'Mental Health Agent', icon: Brain, color: 'text-purple-400', greeting: "Hey there. This is a safe space. Whether you're feeling stressed about exams, overwhelmed with applications, or just need someone to talk to - I'm here." },
+  planning: { name: 'College Planning Agent', icon: GraduationCap, color: 'text-blue-400', greeting: "Hi! I'm your College Planning Agent. Tell me about your dream schools and goals \u2014 I'll build a personalized roadmap!" },
+  teaching: { name: 'Teaching Agent', icon: Sparkles, color: 'text-emerald-400', greeting: "Hey! I'm your Teaching Agent. Ask me anything about your subjects \u2014 I'll explain concepts and cite official sources!" },
+  schedule: { name: 'Schedule Agent', icon: Calendar, color: 'text-amber-400', greeting: "Hello! I'm your Schedule Agent. I'll help track deadlines and plan your study schedule!" },
+  mental: { name: 'Mental Health Agent', icon: Brain, color: 'text-purple-400', greeting: "Hey there. This is a safe space. I'm here to listen and support you through the stress." },
 };
 
 export default function AgentChat() {
   const { agentType } = useParams();
+  const { user } = useAuth();
   const config = AGENT_CONFIGS[agentType || 'teaching'];
-  const [messages, setMessages] = useState<Array<{role: string; content: string}>>([]);
+  const [messages, setMessages] = useState<Array<{role: string; content: string; id?: string}>>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load or create session
+  useEffect(() => {
+    if (!user || !agentType) return;
+    loadSession();
+  }, [user, agentType]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
+  const loadSession = async () => {
+    setLoading(true);
+    // Find existing active session for this agent
+    const { data: sessions } = await supabase
+      .from('chat_sessions').select('*')
+      .eq('student_id', user!.id)
+      .eq('agent_type', agentType)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (sessions && sessions.length > 0) {
+      const sess = sessions[0];
+      setSessionId(sess.id);
+      // Load messages
+      const { data: msgs } = await supabase
+        .from('chat_messages').select('*')
+        .eq('session_id', sess.id)
+        .order('created_at', { ascending: true });
+      setMessages(msgs?.map(m => ({ role: m.role, content: m.content, id: m.id })) || []);
+    } else {
+      setMessages([]);
+      setSessionId(null);
+    }
+    setLoading(false);
+  };
+
+  const ensureSession = async (): Promise<string> => {
+    if (sessionId) return sessionId;
+    // Create new session
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .insert({
+        student_id: user!.id,
+        agent_type: agentType || 'teaching',
+        title: `${config?.name} - ${new Date().toLocaleDateString()}`,
+        message_count: 0,
+      })
+      .select().single();
+    if (error) throw error;
+    setSessionId(data.id);
+    return data.id;
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    if (!input.trim() || !user) return;
+    const userMsg = input.trim();
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
     setIsTyping(true);
 
-    // Call Supabase Edge Function
     try {
-      const { supabase } = await import('@/lib/supabase');
+      const sid = await ensureSession();
+
+      // Save user message to DB
+      await supabase.from('chat_messages').insert({ session_id: sid, role: 'user', content: userMsg });
+      await supabase.from('chat_sessions').update({ message_count: messages.length + 1, updated_at: new Date().toISOString() }).eq('id', sid);
+
+      // Call Edge Function
       const { data: { session } } = await supabase.auth.getSession();
       const funcUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
       const res = await fetch(funcUrl, {
@@ -40,19 +100,30 @@ export default function AgentChat() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
-        body: JSON.stringify({ message: input, student_id: session?.user?.id || '', session_id: 'new', subject: agentType || 'teaching' }),
+        body: JSON.stringify({
+          message: userMsg,
+          student_id: user.id,
+          session_id: sid,
+          agent_type: agentType || 'teaching',
+        }),
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      // Handle non-streaming JSON response
-      const data = await res.json();
-      const reply = data.reply || data.content || data.message || JSON.stringify(data);
+
+      let reply: string;
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.reply || data.content || data.choices?.[0]?.message?.content || 'I received your message. How can I help further?';
+      } else {
+        reply = getFallbackResponse(userMsg, agentType || 'teaching');
+      }
+
+      // Save assistant message to DB
+      await supabase.from('chat_messages').insert({ session_id: sid, role: 'assistant', content: reply });
+      await supabase.from('chat_sessions').update({ message_count: messages.length + 2, updated_at: new Date().toISOString() }).eq('id', sid);
+
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch {
-      // Fallback demo response
-      setTimeout(() => {
-        const fallback = getFallbackResponse(input, agentType || 'teaching');
-        setMessages(prev => [...prev, { role: 'assistant', content: fallback }]);
-      }, 1500);
+    } catch (err: any) {
+      const fallback = getFallbackResponse(userMsg, agentType || 'teaching');
+      setMessages(prev => [...prev, { role: 'assistant', content: fallback }]);
     } finally {
       setIsTyping(false);
     }
@@ -74,9 +145,8 @@ export default function AgentChat() {
           <div><p className="font-medium text-sm text-white">{config?.name}</p><p className="text-xs text-gray-500">AI Agent</p></div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
-            <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />Online
-          </div>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400"><div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Online</div>
+          <span className="text-xs text-gray-500">{messages.length} msgs</span>
         </div>
       </div>
 
@@ -89,22 +159,20 @@ export default function AgentChat() {
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
                 {m.role === 'assistant' && (
                   <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/5">
-                    <button className="text-xs text-gray-500 hover:text-blue-400 flex items-center gap-1"><Bookmark className="w-3 h-3" />Save</button>
+                    <button className="text-xs text-gray-500 hover:text-blue-400 flex items-center gap-1 transition-colors"><Bookmark className="w-3 h-3" />Save</button>
                   </div>
                 )}
               </div>
             </div>
           ))}
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-[#0f172a] rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+            <div className="flex justify-start"><div className="bg-[#0f172a] rounded-2xl px-4 py-3">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-            </div>
+            </div></div>
           )}
           <div ref={bottomRef} />
         </div>
@@ -127,16 +195,12 @@ export default function AgentChat() {
 function getFallbackResponse(input: string, agentType: string): string {
   const lower = input.toLowerCase();
   if (agentType === 'planning') {
-    if (lower.includes('mit')) return "MIT is extremely competitive with a ~4% acceptance rate. For CS, strong math background is crucial.\n\n**Your profile analysis:**\n- SAT 1450 is below their 50th percentile (1520-1580)\n- Focus on raising SAT + strong extracurriculars\n- Consider EA (Nov 1 deadline)\n\nWant me to build a full plan to improve your chances?";
-    return "I'd love to help you plan! To build the best strategy, could you share:\n1. Your target schools (dream, match, safety)\n2. Current test scores\n3. Your intended major\n4. Extracurricular activities\n\nI'll then create a personalized roadmap for you! 🎯";
+    if (lower.includes('mit')) return "MIT is extremely competitive. For CS, you'll need strong math + extracurriculars.\n\n**Recommendations:**\n- SAT: 1520-1580 (50th percentile)\n- Focus on math competitions (AMC, AIME)\n- Consider EA (Nov 1 deadline)\n\nWant me to build a full plan?";
+    return "I'd love to help you plan! Share:\n1. Target schools (dream, match, safety)\n2. Current test scores\n3. Intended major\n4. Extracurriculars\n\nI'll create a personalized roadmap!";
   }
-  if (agentType === 'schedule') {
-    return "Let me help you organize! Based on typical deadlines:\n\n**Upcoming deadlines:**\n- SAT Registration: ~6 weeks before test\n- Common App opens: Aug 1\n- Early Decision: Nov 1\n- Regular Decision: Jan 1-15\n\nWould you like me to create a study schedule based on your courses?";
-  }
-  if (agentType === 'mental') {
-    return "I hear you. That sounds really tough. Remember that it's completely normal to feel this way during intense study periods.\n\n**A few things that might help:**\n- Take a 10-minute walk - it resets your brain\n- Break tasks into smaller chunks (Pomodoro: 25 min study, 5 min break)\n- Talk to someone you trust\n\nYou're doing great by reaching out. Would you like to share what's on your mind? 💙";
-  }
+  if (agentType === 'schedule') return "**Upcoming deadlines:**\n- SAT Registration: ~6 weeks before\n- Common App: Aug 1 opens\n- Early Decision: Nov 1\n- Regular Decision: Jan 1-15\n\nWant me to create a study schedule?";
+  if (agentType === 'mental') return "I hear you. It's completely normal to feel this way during intense periods.\n\n**Tips:**\n- 10-min walk resets your brain\n- Pomodoro: 25 min study, 5 min break\n- Talk to someone you trust\n\nYou're doing great by reaching out. Want to share more?";
   // teaching default
-  if (lower.includes('chain')) return "The Chain Rule is like peeling an onion 🧅\n\n**Chain Rule:** If y = f(g(x)), then dy/dx = f'(g(x)) · g'(x)\n\n**Example:** y = (3x² + 1)⁵\n- Outer: u⁵ → 5u⁴\n- Inner: 3x² + 1 → 6x\n- Result: 5(3x²+1)⁴ · 6x\n\nWant to try one? 🎯\n\n📚 *AP Calculus Course Description 2024, Unit 3*";
-  return "Great question! Let me break this down step by step.\n\nThe key concept here is to identify what you know and what you're looking for, then bridge the gap with the right technique.\n\nWould you like me to:\n1. Explain the concept first?\n2. Walk through an example?\n3. Give you practice problems?";
+  if (lower.includes('chain')) return "The Chain Rule is like peeling an onion!\n\n**If y = f(g(x)):** dy/dx = f'(g(x)) * g'(x)\n\n**Example: y = (3x\u00b2+1)\u2075**\n- Outer: u\u2075 \u2192 5u\u2074\n- Inner: 3x\u00b2+1 \u2192 6x\n- Result: 5(3x\u00b2+1)\u2074 * 6x\n\nWant to try one?\n\n\ud83d\udcd6 *AP Calculus 2024, Unit 3*";
+  return "Great question! Let me break this down step by step.\n\nWould you like me to:\n1. Explain the concept first?\n2. Walk through an example?\n3. Give you practice problems?";
 }

@@ -1,117 +1,211 @@
-import { useState } from 'react';
-import { Award, Target, Clock, Plus, ExternalLink, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { Award, Plus, Target, Clock, Trash2, ExternalLink, TrendingUp, Star } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const competitions = [
-  { id: 'c1', name: 'AMC 12', category: 'STEM', subcategory: 'Mathematics', desc: 'American Mathematics Competition for grades 11-12. 25 MCQ, 75 min.', eligibility: 'Grade 11-12', timeline: 'Nov (A) / Nov (B)', website: 'https://maa.org', difficulty: 4, commitment: 3, prestige: 5, quality: 5, experience: 4, yhea_score: 4.5 },
-  { id: 'c2', name: 'AIME', category: 'STEM', subcategory: 'Mathematics', desc: 'American Invitational Mathematics Examination. 15 problems, 3 hours.', eligibility: 'AMC 10/12 qualifiers', timeline: 'Feb', website: 'https://maa.org', difficulty: 5, commitment: 4, prestige: 5, quality: 5, experience: 4, yhea_score: 4.6 },
-  { id: 'c3', name: 'Physics Bowl', category: 'STEM', subcategory: 'Physics', desc: 'High School Physics Competition by AAPT. 45 questions, 45 min.', eligibility: 'All high school', timeline: 'March', website: 'https://aapt.org', difficulty: 3, commitment: 2, prestige: 4, quality: 4, experience: 4, yhea_score: 3.8 },
-  { id: 'c4', name: 'USACO', category: 'STEM', subcategory: 'Computer Science', desc: 'USA Computing Olympiad. 4 online contests per year.', eligibility: 'All students globally', timeline: 'Dec/Jan/Feb/Open', website: 'https://usaco.org', difficulty: 5, commitment: 5, prestige: 5, quality: 5, experience: 4, yhea_score: 4.8 },
-  { id: 'c5', name: 'IEO', category: 'Humanities', subcategory: 'Economics', desc: 'International Economics Olympiad. Economics + Finance + Business case.', eligibility: 'Grade 9-12', timeline: 'July (national) / Sep (intl)', website: 'https://ecolymp.org', difficulty: 3, commitment: 3, prestige: 4, quality: 4, experience: 4, yhea_score: 3.8 },
-  { id: 'c6', name: 'NEC', category: 'Humanities', subcategory: 'Economics', desc: 'National Economics Challenge. Teams of 3-4 students.', eligibility: 'High school teams', timeline: 'Dec-Feb', website: 'https://counciforeconed.org', difficulty: 3, commitment: 3, prestige: 3, quality: 4, experience: 5, yhea_score: 3.6 },
-  { id: 'c7', name: 'FRC', category: 'STEM', subcategory: 'Engineering', desc: 'FIRST Robotics Competition. Build 120lb robots in 6 weeks.', eligibility: 'High school teams', timeline: 'Jan-Apr', website: 'https://firstinspires.org', difficulty: 4, commitment: 5, prestige: 4, quality: 5, experience: 5, yhea_score: 4.5 },
-  { id: 'c8', name: 'Conrad Challenge', category: 'STEM', subcategory: 'Innovation', desc: 'Entrepreneurship + STEM innovation competition. Teams create solutions.', eligibility: 'Age 13-18', timeline: 'Oct-Feb', website: 'https://conradchallenge.org', difficulty: 3, commitment: 4, prestige: 3, quality: 4, experience: 5, yhea_score: 3.8 },
-];
-
-const categories = ['All', 'STEM', 'Humanities', 'Business', 'Arts', 'Comprehensive'];
-
-function PentagonScore({ scores }: { scores: { difficulty: number; commitment: number; prestige: number; quality: number; experience: number } }) {
-  const s = scores;
-  const points = [
-    { x: 50, y: 50 - s.difficulty * 8 },
-    { x: 50 + Math.sin(72 * Math.PI / 180) * s.prestige * 8, y: 50 - Math.cos(72 * Math.PI / 180) * s.prestige * 8 },
-    { x: 50 + Math.sin(144 * Math.PI / 180) * s.experience * 8, y: 50 - Math.cos(144 * Math.PI / 180) * s.experience * 8 },
-    { x: 50 + Math.sin(216 * Math.PI / 180) * s.quality * 8, y: 50 - Math.cos(216 * Math.PI / 180) * s.quality * 8 },
-    { x: 50 + Math.sin(288 * Math.PI / 180) * s.commitment * 8, y: 50 - Math.cos(288 * Math.PI / 180) * s.commitment * 8 },
-  ];
-  const polygon = points.map(p => `${p.x},${p.y}`).join(' ');
-  const labels = ['Difficulty', 'Prestige', 'Experience', 'Quality', 'Commitment'];
-  const labelPos = [
-    { x: 50, y: 8 }, { x: 92, y: 30 }, { x: 78, y: 88 }, { x: 22, y: 88 }, { x: 8, y: 30 },
-  ];
-
-  return (
-    <svg viewBox="0 0 100 100" className="w-28 h-28">
-      {/* Background pentagon */}
-      <polygon points="50,10 90,38 78,90 22,90 10,38" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-      <polygon points="50,26 74,42 66,74 34,74 26,42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-      <polygon points="50,42 58,54 54,82 46,82 42,54" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-      {/* Score pentagon */}
-      <polygon points={polygon} fill="rgba(59,130,246,0.3)" stroke="#3b82f6" strokeWidth="1.5" />
-      {/* Labels */}
-      {labels.map((l, i) => <text key={i} x={labelPos[i].x} y={labelPos[i].y} textAnchor="middle" fontSize="6" fill="#9ca3af">{l}</text>)}
-    </svg>
-  );
-}
-
 export default function Background() {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const filtered = activeCategory === 'All' ? competitions : competitions.filter(c => c.category === activeCategory);
+  const { user } = useAuth();
+  const [competitions, setCompetitions] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('competitions');
+  const [showCompForm, setShowCompForm] = useState(false);
+  const [showProjForm, setShowProjForm] = useState(false);
+
+  // Competition form
+  const [compName, setCompName] = useState('');
+  const [compCategory, setCompCategory] = useState('');
+  const [compDesc, setCompDesc] = useState('');
+  const [compDiff, setCompDiff] = useState(3);
+
+  // Project form
+  const [projTitle, setProjTitle] = useState('');
+  const [projDesc, setProjDesc] = useState('');
+  const [projStatus, setProjStatus] = useState('in_progress');
+  const [projImpact, setProjImpact] = useState(3);
+
+  useEffect(() => { fetchData(); }, [user]);
+
+  const fetchData = async () => {
+    if (!user) return;
+    const { data: c } = await supabase.from('competitions').select('*').eq('is_active', true).order('prestige_score', { ascending: false });
+    setCompetitions(c || []);
+    const { data: p } = await supabase.from('background_projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    setProjects(p || []);
+  };
+
+  const addCompetition = async () => {
+    if (!compName.trim()) return;
+    await supabase.from('competitions').insert({
+      name: compName.trim(), category: compCategory || 'General',
+      description: compDesc.trim() || null, difficulty_level: compDiff, prestige_score: compDiff,
+      is_active: true,
+    });
+    setShowCompForm(false); setCompName(''); setCompCategory(''); setCompDesc(''); setCompDiff(3);
+    fetchData();
+  };
+
+  const addProject = async () => {
+    if (!user || !projTitle.trim()) return;
+    await supabase.from('background_projects').insert({
+      user_id: user.id, title: projTitle.trim(), description: projDesc.trim() || null,
+      category: 'academic', status: projStatus, impact_level: projImpact,
+    });
+    setShowProjForm(false); setProjTitle(''); setProjDesc(''); setProjStatus('in_progress'); setProjImpact(3);
+    fetchData();
+  };
+
+  const deleteProject = async (id: string) => {
+    await supabase.from('background_projects').delete().eq('id', id);
+    fetchData();
+  };
+
+  // Compute pentagon scores from user's data
+  const academic = projects.filter(p => p.category === 'academic').length;
+  const leadership = projects.filter(p => p.category === 'leadership').length;
+  const research = projects.filter(p => p.category === 'research').length;
+  const service = projects.filter(p => p.category === 'service').length;
+  const creativity = projects.filter(p => p.category === 'creative').length;
+  const maxVal = Math.max(academic, leadership, research, service, creativity, 1);
+  const scores = [
+    { label: 'Academic', value: (academic / maxVal) * 5, count: academic },
+    { label: 'Leadership', value: (leadership / maxVal) * 5, count: leadership },
+    { label: 'Research', value: (research / maxVal) * 5, count: research },
+    { label: 'Service', value: (service / maxVal) * 5, count: service },
+    { label: 'Creativity', value: (creativity / maxVal) * 5, count: creativity },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div><h2 className="text-2xl font-bold flex items-center gap-2"><Award className="w-6 h-6 text-amber-400" />Background</h2><p className="text-gray-400 mt-1">Competitions, projects & background building</p></div>
-        <Button className="bg-amber-600"><Plus className="w-4 h-4 mr-1" />Add Project</Button>
-      </div>
+      <div><h2 className="text-2xl font-bold flex items-center gap-2"><Award className="w-6 h-6 text-amber-400" />Background</h2><p className="text-gray-400 mt-1">Competitions, projects, and strength analysis</p></div>
 
-      {/* Categories */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map(c => (
-          <button key={c} onClick={() => setActiveCategory(c)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${activeCategory === c ? 'bg-amber-600/20 border-amber-500 text-amber-400' : 'bg-[#1e293b] border-white/10 text-gray-400 hover:border-white/20'}`}>{c}</button>
-        ))}
-      </div>
+      {/* Pentagon Radar */}
+      <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-5">
+        <div className="flex items-center justify-center">
+          <svg width="240" height="200" viewBox="0 0 240 200">
+            <g transform="translate(120,100)">
+              {[1,2,3,4,5].map(i => (
+                <polygon key={i} points={scores.map((_, j) => {
+                  const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                  const r = (i / 5) * 80;
+                  return `${Math.cos(angle) * r},${Math.sin(angle) * r}`;
+                }).join(' ')} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+              ))}
+              <polygon points={scores.map((s, j) => {
+                const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                const r = (s.value / 5) * 80;
+                return `${Math.cos(angle) * r},${Math.sin(angle) * r}`;
+              }).join(' ')} fill="rgba(251,191,36,0.2)" stroke="#fbbf24" strokeWidth="1.5" />
+              {scores.map((s, j) => {
+                const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                const r = 88;
+                return <text key={j} x={Math.cos(angle) * r} y={Math.sin(angle) * r} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" fontSize="9">{s.label}</text>;
+              })}
+              {scores.map((s, j) => {
+                const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                const r = (s.value / 5) * 80;
+                return <circle key={j} cx={Math.cos(angle) * r} cy={Math.sin(angle) * r} r="3" fill="#fbbf24" />;
+              })}
+            </g>
+          </svg>
+        </div>
+      </CardContent></Card>
 
-      <Tabs defaultValue="competitions">
-        <TabsList className="bg-[#1e293b] border border-white/10"><TabsTrigger value="competitions"><Award className="w-4 h-4 mr-1" />Competitions</TabsTrigger><TabsTrigger value="projects"><Lock className="w-4 h-4 mr-1" />My Projects</TabsTrigger></TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-[#1e293b] border border-white/10"><TabsTrigger value="competitions">Competitions</TabsTrigger><TabsTrigger value="projects">My Projects</TabsTrigger></TabsList>
 
-        <TabsContent value="competitions" className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map(c => (
-            <Card key={c.id} className="bg-[#1e293b] border-white/10 hover:border-amber-500/30 transition-all">
-              <CardContent className="p-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0"><PentagonScore scores={{ difficulty: c.difficulty, commitment: c.commitment, prestige: c.prestige, quality: c.quality, experience: c.experience }} /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold">{c.name}</h3>
-                      <Badge className="bg-amber-500/20 text-amber-400 text-xs">Yhea {c.yhea_score}</Badge>
-                    </div>
-                    <div className="flex gap-2 mt-1"><Badge variant="outline" className="text-xs border-white/10">{c.category}</Badge><Badge variant="outline" className="text-xs border-white/10">{c.subcategory}</Badge></div>
-                    <p className="text-sm text-gray-400 mt-2 line-clamp-2">{c.desc}</p>
-                    <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Target className="w-3 h-3" />{c.eligibility}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{c.timeline}</span>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      {c.website && <a href={c.website} target="_blank" className="text-xs text-blue-400 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Website</a>}
-                    </div>
-                    {/* Score bars */}
-                    <div className="grid grid-cols-5 gap-1 mt-3">
-                      {[{ label: 'Difficulty', val: c.difficulty }, { label: 'Commitment', val: c.commitment }, { label: 'Prestige', val: c.prestige }, { label: 'Quality', val: c.quality }, { label: 'Experience', val: c.experience }].map(s => (
-                        <div key={s.label} className="text-center">
-                          <div className="flex gap-0.5 justify-center">{Array.from({ length: 5 }, (_, i) => <div key={i} className={`w-1.5 h-3 rounded-sm ${i < s.val ? 'bg-amber-500' : 'bg-white/10'}`} />)}</div>
-                          <span className="text-[10px] text-gray-500 mt-0.5 block">{s.label}</span>
+        <TabsContent value="competitions" className="mt-4">
+          <div className="flex justify-end mb-3"><Button size="sm" className="bg-amber-600" onClick={() => setShowCompForm(true)}><Plus className="w-4 h-4 mr-1" />Add Competition</Button></div>
+          {competitions.length === 0 ? (
+            <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-8 text-center text-gray-500"><Award className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>No competitions added yet.</p></CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {competitions.map(c => (
+                <Card key={c.id} className="bg-[#1e293b] border-white/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{c.name}</p>
+                        {c.description && <p className="text-xs text-gray-500 mt-1">{c.description}</p>}
+                        <div className="flex items-center gap-2 mt-2">
+                          {Array.from({ length: 5 }, (_, i) => <Star key={i} className={`w-3 h-3 ${i < (c.prestige_score || 3) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />)}
+                          <span className="text-xs text-gray-500 ml-1">Prestige {c.prestige_score}/5</span>
                         </div>
-                      ))}
+                      </div>
+                      {c.website_url && <a href={c.website_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-2"><ExternalLink className="w-4 h-4" /></a>}
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="projects" className="mt-4">
-          <div className="text-center py-12 text-gray-500">
-            <Lock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Your personal projects (not public)</p>
-            <Button className="mt-4 bg-amber-600"><Plus className="w-4 h-4 mr-1" />Add Personal Project</Button>
-          </div>
+          <div className="flex justify-end mb-3"><Button size="sm" className="bg-amber-600" onClick={() => setShowProjForm(true)}><Plus className="w-4 h-4 mr-1" />New Project</Button></div>
+          {projects.length === 0 ? (
+            <Card className="bg-[#1e293b] border-white/10"><CardContent className="p-8 text-center text-gray-500"><Target className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>No projects yet. Start one!</p></CardContent></Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {projects.map(p => (
+                <Card key={p.id} className="bg-[#1e293b] border-white/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{p.title}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : p.status === 'in_progress' ? 'bg-blue-500/10 text-blue-400' : 'bg-gray-500/10 text-gray-400'}`}>{p.status}</span>
+                        </div>
+                        {p.description && <p className="text-xs text-gray-500 mt-1">{p.description}</p>}
+                        <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                          <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" />Impact {p.impact_level}/5</span>
+                          {p.start_date && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(p.start_date).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteProject(p.id)} className="text-red-400 hover:text-red-300 ml-2"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
+
+      {/* Competition Form */}
+      <Dialog open={showCompForm} onOpenChange={setShowCompForm}>
+        <DialogContent className="bg-[#1e293b] border-white/10 text-white max-w-md">
+          <DialogHeader><DialogTitle>Add Competition</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Competition Name *" value={compName} onChange={e => setCompName(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <Input placeholder="Category (Math/Science/CS/etc)" value={compCategory} onChange={e => setCompCategory(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <Textarea placeholder="Description" value={compDesc} onChange={e => setCompDesc(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <div><label className="text-xs text-gray-400">Prestige Level</label>
+              <div className="flex gap-1 mt-1">{[1,2,3,4,5].map(i => <button key={i} onClick={() => setCompDiff(i)}><Star className={`w-6 h-6 ${i <= compDiff ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} /></button>)}</div>
+            </div>
+            <Button className="w-full bg-amber-600" onClick={addCompetition} disabled={!compName.trim()}><Plus className="w-4 h-4 mr-1" />Add</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Project Form */}
+      <Dialog open={showProjForm} onOpenChange={setShowProjForm}>
+        <DialogContent className="bg-[#1e293b] border-white/10 text-white max-w-md">
+          <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Project Title *" value={projTitle} onChange={e => setProjTitle(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <Textarea placeholder="Description" value={projDesc} onChange={e => setProjDesc(e.target.value)} className="bg-[#0f172a] border-white/10" />
+            <div><label className="text-xs text-gray-400">Status</label><div className="flex gap-2 mt-1">{['planned','in_progress','completed'].map(s => <button key={s} onClick={() => setProjStatus(s)} className={`px-3 py-1 rounded text-xs ${projStatus === s ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-[#0f172a] border border-white/10 text-gray-400'}`}>{s}</button>)}</div></div>
+            <div><label className="text-xs text-gray-400">Impact Level</label><div className="flex gap-1 mt-1">{[1,2,3,4,5].map(i => <button key={i} onClick={() => setProjImpact(i)}><Star className={`w-6 h-6 ${i <= projImpact ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} /></button>)}</div></div>
+            <Button className="w-full bg-amber-600" onClick={addProject} disabled={!projTitle.trim()}><Plus className="w-4 h-4 mr-1" />Create</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
