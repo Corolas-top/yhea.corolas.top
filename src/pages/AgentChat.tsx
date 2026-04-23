@@ -92,13 +92,12 @@ export default function AgentChat() {
       await supabase.from('chat_sessions').update({ message_count: messages.length + 1, updated_at: new Date().toISOString() }).eq('id', sid);
 
       // Call Edge Function
-      const { data: { session } } = await supabase.auth.getSession();
       const funcUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
       const res = await fetch(funcUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
           message: userMsg,
