@@ -6,7 +6,6 @@ import { Send, Sparkles, Brain, GraduationCap, Calendar, Loader2, Bookmark } fro
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { createClient } from '@supabase/supabase-js'；
 
 const AGENT_CONFIGS: Record<string, { name: string; icon: any; color: string; greeting: string }> = {
   planning: { name: 'College Planning Agent', icon: GraduationCap, color: 'text-blue-400', greeting: "Hi! I'm your College Planning Agent. Tell me about your dream schools and goals \u2014 I'll build a personalized roadmap!" },
@@ -99,7 +98,7 @@ export default function AgentChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
           message: userMsg,
