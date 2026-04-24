@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 export default function MyUniversities() {
   const { user } = useAuth();
   const [targets, setTargets] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [allUnis, setAllUnis] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => { if (user) fetchData(); }, [user]);
 
   const fetchData = async () => {
+    setLoading(true);
+    setLoading(true);
     if (!user) return;
     const { data: t } = await supabase.from('student_university_targets').select('*, university:universities(*)').eq('student_id', user.id);
     setTargets(t || []);
@@ -66,7 +69,7 @@ export default function MyUniversities() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {t.university?.logo_url ? <img src={t.university.logo_url} className="w-10 h-10 object-contain rounded" /> : <div className="w-10 h-10 rounded bg-blue-600/20 flex items-center justify-center text-sm font-bold">{t.university?.short_name?.[0]}</div>}
-                    <div><p className="font-medium">{t.university?.name}</p><p className="text-xs text-gray-500">{t.university?.country} {t.university?.ranking_qs ? `\u00b7 QS #${t.university.ranking_qs}` : ''}</p></div>
+                    <div><p className="font-medium">{t.university?.name}</p><p className="text-xs text-gray-500">{t.university?.country} {t.university?.ranking_qs ? `· QS #${t.university.ranking_qs}` : ''}</p></div>
                   </div>
                   <button onClick={() => removeTarget(t.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                 </div>

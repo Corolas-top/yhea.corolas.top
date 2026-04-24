@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 export default function Tasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('all');
 
@@ -25,6 +26,7 @@ export default function Tasks() {
   useEffect(() => { fetchTasks(); }, [user]);
 
   const fetchTasks = async () => {
+    setLoading(true);
     if (!user) return;
     const { data } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('due_date', { ascending: true });
     setTasks(data || []);

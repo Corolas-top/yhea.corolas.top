@@ -92,7 +92,7 @@ export default function Dashboard() {
       <div>
         <h2 className="text-2xl font-bold flex items-center gap-2"><LayoutDashboard className="w-6 h-6 text-blue-400" />Dashboard</h2>
         <p className="text-gray-400 mt-1">
-          {loading ? 'Loading...' : profile ? `${profile.curriculum} Year ${profile.year} \u00b7 Welcome back, ${user?.name}!` : `Welcome, ${user?.name}!`}
+          {loading ? 'Loading...' : profile ? `${profile.curriculum} Year ${profile.year} · Welcome back, ${user?.name}!` : `Welcome, ${user?.name}!`}
         </p>
       </div>
 
@@ -195,7 +195,7 @@ export default function Dashboard() {
             {notes.map(n => (
               <div key={n.id} className="p-4 bg-[#0f172a] rounded-lg hover:bg-[#0f172a]/80 transition-colors cursor-pointer" onClick={() => navigate('/notes')}>
                 <p className="text-sm font-medium truncate">{n.title}</p>
-                <p className="text-xs text-gray-500 mt-1">{n.visibility} \u00b7 {n.heat_score || 0} pts</p>
+                <p className="text-xs text-gray-500 mt-1">{n.visibility} · {n.heat_score || 0} pts</p>
               </div>
             ))}
           </div>

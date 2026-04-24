@@ -48,7 +48,7 @@ export default function Learning() {
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center"><BookOpen className="w-5 h-5 text-blue-400" /></div>
-          <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{course.full_name}</p><p className="text-xs text-gray-500">{course.total_units} units \u00b7 {course.estimated_hours || '?'} hrs</p></div>
+          <div className="flex-1 min-w-0"><p className="font-medium text-sm truncate">{course.full_name}</p><p className="text-xs text-gray-500">{course.total_units} units · {course.estimated_hours || '?'} hrs</p></div>
           <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
         </div>
         {course.description && <p className="text-xs text-gray-500 mt-2 line-clamp-2">{course.description}</p>}
@@ -64,12 +64,12 @@ export default function Learning() {
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center"><Award className="w-5 h-5 text-amber-400" /></div>
-          <div className="flex-1"><p className="font-medium text-sm">{test.name}</p><p className="text-xs text-gray-500">{test.max_score || 'N/A'} max \u00b7 {test.duration || 'N/A'}</p></div>
+          <div className="flex-1"><p className="font-medium text-sm">{test.name}</p><p className="text-xs text-gray-500">{test.max_score || 'N/A'} max · {test.duration || 'N/A'}</p></div>
         </div>
         {test.sections && test.sections.length > 0 && (
           <div className="mt-3 space-y-1">
             {test.sections.map((s: any) => (
-              <div key={s.id} className="flex items-center justify-between text-xs p-2 bg-[#0f172a] rounded"><span className="text-gray-300">{s.name}</span><span className="text-gray-500">{s.duration} \u00b7 {s.score_range}</span></div>
+              <div key={s.id} className="flex items-center justify-between text-xs p-2 bg-[#0f172a] rounded"><span className="text-gray-300">{s.name}</span><span className="text-gray-500">{s.duration} · {s.score_range}</span></div>
             ))}
           </div>
         )}

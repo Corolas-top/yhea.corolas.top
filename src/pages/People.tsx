@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function People() {
   const { user } = useAuth();
   const [friends, setFriends] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [groups, setGroups] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -19,6 +20,8 @@ export default function People() {
   const [activeTab, setActiveTab] = useState('friends');
 
   const fetchData = async () => {
+    setLoading(true);
+    setLoading(true);
     if (!user) return;
     // Friendships where user is requester or addressee
     const { data: fData } = await supabase

@@ -19,7 +19,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Form state
   const [formTitle, setFormTitle] = useState('');

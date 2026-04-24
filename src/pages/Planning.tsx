@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function Planning() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [targets, setTargets] = useState<any[]>([]);
   const [unis, setUnis] = useState<any[]>([]);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -30,6 +31,8 @@ export default function Planning() {
   useEffect(() => { fetchData(); }, [user]);
 
   const fetchData = async () => {
+    setLoading(true);
+    setLoading(true);
     if (!user) return;
     // Tasks
     const { data: td } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('due_date', { ascending: true });
@@ -137,7 +140,7 @@ export default function Planning() {
                     return uni ? (
                       <div key={t.id} className="flex items-center gap-2 px-3 py-2 bg-[#0f172a] rounded-lg">
                         {uni.logo_url ? <img src={uni.logo_url} className="w-6 h-6 object-contain" /> : <div className="w-6 h-6 rounded bg-blue-600/20 flex items-center justify-center text-xs font-bold">{uni.short_name?.[0]}</div>}
-                        <div><p className="text-sm font-medium">{uni.name}</p><p className="text-xs text-gray-500">{uni.country} {uni.ranking_qs ? `\u00b7 QS #${uni.ranking_qs}` : ''}</p></div>
+                        <div><p className="text-sm font-medium">{uni.name}</p><p className="text-xs text-gray-500">{uni.country} {uni.ranking_qs ? `· QS #${uni.ranking_qs}` : ''}</p></div>
                         <button onClick={() => removeTarget(t.id)} className="ml-2 text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     ) : null;

@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 export default function ProfilePage() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
+  const [, setLoading] = useState(true);
   const [points, setPoints] = useState<any>(null);
   const [quota, setQuota] = useState<any>(null);
   const [name, setName] = useState('');
@@ -21,6 +22,7 @@ export default function ProfilePage() {
   useEffect(() => { if (user) fetchProfile(); }, [user]);
 
   const fetchProfile = async () => {
+    setLoading(true);
     if (!user) return;
     const { data: p } = await supabase.from('student_profiles').select('*').eq('user_id', user.id).single();
     setProfile(p);
@@ -83,7 +85,7 @@ export default function ProfilePage() {
           <div className="space-y-2">
             <p className="text-sm text-gray-400">Daily AI Usage</p>
             <Progress value={(aiUsed / aiTotal) * 100} className="h-2" />
-            <p className="text-xs text-gray-500">{aiUsed} used \u00b7 {aiTotal - aiUsed} remaining</p>
+            <p className="text-xs text-gray-500">{aiUsed} used · {aiTotal - aiUsed} remaining</p>
           </div>
           {profile && (
             <div className="mt-4 space-y-2">

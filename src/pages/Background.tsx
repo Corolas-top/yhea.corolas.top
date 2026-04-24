@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function Background() {
   const { user } = useAuth();
   const [competitions, setCompetitions] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('competitions');
   const [showCompForm, setShowCompForm] = useState(false);
@@ -32,6 +33,8 @@ export default function Background() {
   useEffect(() => { fetchData(); }, [user]);
 
   const fetchData = async () => {
+    setLoading(true);
+    setLoading(true);
     if (!user) return;
     const { data: c } = await supabase.from('competitions').select('*').eq('is_active', true).order('prestige_score', { ascending: false });
     setCompetitions(c || []);

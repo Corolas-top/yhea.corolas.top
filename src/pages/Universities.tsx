@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input';
 export default function Universities() {
   const navigate = useNavigate();
   const [unis, setUnis] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [country, setCountry] = useState('');
 
   useEffect(() => { fetchUnis(); }, []);
 
   const fetchUnis = async () => {
+    setLoading(true);
     let q = supabase.from('universities').select('*').eq('is_active', true);
     if (country) q = q.eq('country', country);
     q = q.order('ranking_qs', { ascending: true });

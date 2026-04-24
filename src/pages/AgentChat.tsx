@@ -75,11 +75,11 @@ export default function AgentChat() {
 
   const ensureSession = async (): Promise<string> => {
     if (sessionId) return sessionId;
-    const { data, error } = await supabase.from('chat_sessions').insert({
+    const { data } = await supabase.from('chat_sessions').insert({
       student_id: user!.id, agent_type: agentType || 'free',
       title: `${config?.name} - ${new Date().toLocaleDateString()}`, message_count: 0,
     }).select().single();
-    if (error) throw error;
+    if (!data) throw new Error('Failed to create session');
     setSessionId(data.id);
     return data.id;
   };
@@ -119,14 +119,34 @@ export default function AgentChat() {
         setIsTyping(false); return;
       }
 
+      // Get session token for Edge Function internal use
+      const { data: { session } } = await supabase.auth.getSession();
+
       let reply = '';
       try {
-        const { data: funcData, error: funcError } = await supabase.functions.invoke('agent-chat', {
-          body: { message: userMsg, student_id: user.id, session_id: sid, agent_type: agentType || 'free' },
+        // Use fetch with apikey (anon key) for Edge Runtime auth + pass access_token in body
+        const funcUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
+        const res = await fetch(funcUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            message: userMsg,
+            student_id: user.id,
+            session_id: sid,
+            agent_type: agentType || 'free',
+            access_token: session?.access_token,
+          }),
         });
-        if (funcError) throw funcError;
-        reply = funcData?.reply || funcData?.content || 'I received your message. How can I help further?';
-      } catch {
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Edge Function ${res.status}: ${errText}`);
+        }
+        const data = await res.json();
+        reply = data.reply || data.content || 'I received your message. How can I help further?';
+      } catch (e: any) {
         reply = getFallbackResponse(userMsg, agentType || 'free');
       }
 
@@ -135,7 +155,7 @@ export default function AgentChat() {
         await supabase.from('chat_sessions').update({ message_count: messages.length + 2, updated_at: new Date().toISOString() }).eq('id', sid);
         setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       }
-    } catch {
+    } catch (err: any) {
       const fallback = getFallbackResponse(userMsg, agentType || 'free');
       setMessages(prev => [...prev, { role: 'assistant', content: fallback }]);
     } finally {

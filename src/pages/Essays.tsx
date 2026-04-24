@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 export default function Essays() {
   const { user } = useAuth();
   const [essays, setEssays] = useState<any[]>([]);
+  const [, setLoading] = useState(true);
   const [systems, setSystems] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -25,6 +26,8 @@ export default function Essays() {
   useEffect(() => { fetchData(); }, [user]);
 
   const fetchData = async () => {
+    setLoading(true);
+    setLoading(true);
     if (!user) return;
     const { data: e } = await supabase.from('essays').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
     setEssays(e || []);

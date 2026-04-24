@@ -19,12 +19,14 @@ const SYSTEMS_DATA = [
 export default function ApplyGuide() {
   const navigate = useNavigate();
   const [guides, setGuides] = useState<Record<string, any[]>>({});
+  const [, setLoading] = useState(true);
 
   useEffect(() => {
     fetchGuides();
   }, []);
 
   const fetchGuides = async () => {
+    setLoading(true);
     for (const sys of SYSTEMS_DATA) {
       const { data } = await supabase.from('application_guides').select('*').eq('section', sys.slug).eq('is_active', true).order('order_index', { ascending: true });
       if (data && data.length > 0) {
