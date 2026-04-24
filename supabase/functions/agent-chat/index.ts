@@ -15,18 +15,7 @@ const corsHeaders = {
 
 // Agent-specific system prompts
 const AGENT_PROMPTS: Record<string, string> = {
-  teaching: `You are Yhea Teaching Agent, an expert tutor for AP, A-Level, and IB students.
-
-Rules:
-- Teach with clear, structured explanations using the Socratic method
-- Always cite official sources (e.g., "AP Calculus Course Description 2024, Unit 3")
-- Start with an intuitive analogy, then formal definition, then example
-- Point out common mistakes
-- Never write full essays, IAs, or EEs - only provide structure and guidance
-- Use LaTeX formatting for math: $x^2$, $\frac{a}{b}$, etc.
-- Be warm and encouraging`,
-
-  planning: `You are Yhea College Planning Agent, an expert in university admissions.
+  planning: `You are Yhea Admission Advisor, an expert in university admissions.
 
 Rules:
 - Provide data-driven advice about university admissions
@@ -35,6 +24,44 @@ Rules:
 - Always mention specific deadlines and requirements
 - Never guarantee admission - be honest about competitiveness
 - Suggest concrete next steps`,
+
+  admission: `You are Yhea Admission Advisor, an expert in university admissions.
+
+Rules:
+- Provide data-driven advice about university admissions
+- Help students build balanced school lists (reach, match, safety)
+- Consider the student's full profile (scores, activities, background)
+- Always mention specific deadlines and requirements
+- Never guarantee admission - be honest about competitiveness
+- Suggest concrete next steps`,
+
+  essay: `You are Yhea Essay Assistant, helping students with application essays.
+
+Rules:
+- Help brainstorm, outline, and refine application essays
+- For Common App, UCAS, Coalition, UC, MIT, etc.
+- Provide specific feedback on structure, voice, and content
+- Never write the essay for the student
+- Suggest improvements while preserving the student's authentic voice`,
+
+  teacher: `You are Yhea Course Teacher, an expert tutor for AP, A-Level, and IB students.
+
+Rules:
+- Teach with clear, structured explanations using the Socratic method
+- Always cite official sources (e.g., "AP Calculus Course Description 2024, Unit 3")
+- Start with an intuitive analogy, then formal definition, then example
+- Point out common mistakes
+- Never write full essays, IAs, or EEs - only provide structure and guidance
+- Use LaTeX formatting for math: $x^2$, $\\frac{a}{b}$, etc.
+- Be warm and encouraging`,
+
+  free: `You are Yhea Free Agent — a versatile AI assistant for students.
+
+Rules:
+- You can research universities, explain concepts, help with planning, provide emotional support, or any other task
+- Be helpful, accurate, and concise
+- When unsure, say so rather than making things up
+- Use your knowledge of the education system to provide relevant advice`,
 
   schedule: `You are Yhea Schedule Agent, helping students manage their time.
 
@@ -86,7 +113,7 @@ serve(async (req) => {
     const { data: memories } = await supabase
       .from('agent_memories').select('*')
       .eq('student_id', student_id)
-      .order('frequency', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(10);
 
     // Fetch recent chat context (last 10 messages)
@@ -100,8 +127,12 @@ serve(async (req) => {
       recentMessages = (msgs || []).reverse();
     }
 
+    // Normalize agent_type
+    const validAgentTypes = ['admission', 'teacher', 'essay', 'free', 'planning', 'schedule', 'mental'];
+    const normalizedType = validAgentTypes.includes(agent_type || '') ? (agent_type || 'free') : 'free';
+
     // Build context
-    const agentPrompt = AGENT_PROMPTS[agent_type || 'teaching'] || AGENT_PROMPTS.teaching;
+    const agentPrompt = AGENT_PROMPTS[normalizedType] || AGENT_PROMPTS.free;
 
     let contextMsg = '';
     if (profile) {
@@ -147,12 +178,24 @@ serve(async (req) => {
     const reply = result.choices?.[0]?.message?.content || 'I apologize, I could not generate a response.';
 
     // Store memory from interaction (simple keyword-based)
-    const lowerMsg = message.toLowerCase();
-    if (lowerMsg.includes('struggle') || lowerMsg.includes('hard') || lowerMsg.includes('difficult')) {
-      await supabase.from('agent_memories').upsert({
-        student_id, memory_type: 'weak_point', content: `Student finds this challenging: ${message.slice(0, 200)}`,
-        confidence: 0.6, frequency: 1,
-      }, { onConflict: 'student_id,memory_type,content' });
+    try {
+      const lowerMsg = message.toLowerCase();
+      if (lowerMsg.includes('struggle') || lowerMsg.includes('hard') || lowerMsg.includes('difficult')) {
+        await supabase.from('agent_memories').insert({
+          student_id, agent_type: normalizedType, memory_type: 'weak_point',
+          content: `Student finds this challenging: ${message.slice(0, 200)}`,
+          confidence: 0.6,
+        });
+      }
+      if (lowerMsg.includes('good at') || lowerMsg.includes('strong') || lowerMsg.includes('excel')) {
+        await supabase.from('agent_memories').insert({
+          student_id, agent_type: normalizedType, memory_type: 'strong_point',
+          content: `Student strength: ${message.slice(0, 200)}`,
+          confidence: 0.6,
+        });
+      }
+    } catch (_memErr) {
+      // Memory insert non-critical
     }
 
     return new Response(JSON.stringify({ reply, model: result.model, usage: result.usage }), {

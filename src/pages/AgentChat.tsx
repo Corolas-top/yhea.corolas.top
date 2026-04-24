@@ -51,8 +51,8 @@ export default function AgentChat() {
 
   const fetchQuota = async () => {
     if (!user) return;
-    const { data } = await supabase.from('ai_usage_quotas').select('*').eq('user_id', user.id).single();
-    if (data) setQuota(data.base_remaining + data.bonus_remaining);
+    const { data } = await supabase.from('users').select('agent_quota, agent_quota_used').eq('id', user.id).single();
+    if (data) setQuota(Math.max(0, data.agent_quota - data.agent_quota_used));
   };
 
   const loadSession = async () => {
@@ -86,17 +86,12 @@ export default function AgentChat() {
 
   const consumeQuota = async (): Promise<boolean> => {
     if (!user) return false;
-    const { data } = await supabase.from('ai_usage_quotas').select('*').eq('user_id', user.id).single();
+    const { data } = await supabase.from('users').select('agent_quota, agent_quota_used').eq('id', user.id).single();
     if (!data) return false;
-    const total = data.base_remaining + data.bonus_remaining;
-    if (total <= 0) return false;
-    // Decrement base first, then bonus
-    if (data.base_remaining > 0) {
-      await supabase.from('ai_usage_quotas').update({ base_remaining: data.base_remaining - 1, total_used_lifetime: data.total_used_lifetime + 1 }).eq('user_id', user.id);
-    } else {
-      await supabase.from('ai_usage_quotas').update({ bonus_remaining: data.bonus_remaining - 1, total_used_lifetime: data.total_used_lifetime + 1 }).eq('user_id', user.id);
-    }
-    setQuota(total - 1);
+    const remaining = data.agent_quota - data.agent_quota_used;
+    if (remaining <= 0) return false;
+    await supabase.from('users').update({ agent_quota_used: data.agent_quota_used + 1 }).eq('id', user.id);
+    setQuota(remaining - 1);
     return true;
   };
 

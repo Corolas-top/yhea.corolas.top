@@ -682,3 +682,24 @@ CREATE TRIGGER on_flashcard_change
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES ('yhea', 'yhea', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- INDEXES for performance
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_universities_qs ON public.universities(ranking_qs) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_universities_country ON public.universities(country);
+CREATE INDEX IF NOT EXISTS idx_rankings_university ON public.university_rankings(university_id, ranking_system, year);
+CREATE INDEX IF NOT EXISTS idx_courses_curriculum ON public.courses(curriculum) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_student_targets ON public.student_university_targets(student_id, status);
+CREATE INDEX IF NOT EXISTS idx_notes_author ON public.notes(author_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notes_published ON public.notes(visibility, heat_score DESC) WHERE visibility = 'published';
+CREATE INDEX IF NOT EXISTS idx_tasks_user ON public.tasks(user_id, due_date, status);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_student ON public.chat_sessions(student_id, agent_type, status);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON public.chat_messages(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_user ON public.calendar_events(user_id, start_at);
+CREATE INDEX IF NOT EXISTS idx_background_category ON public.background_resources(category, subcategory) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON public.flashcards(deck_id);
+CREATE INDEX IF NOT EXISTS idx_friendships ON public.friendships(requester_id, addressee_id, status);
+CREATE INDEX IF NOT EXISTS idx_social_messages_sender ON public.social_messages(sender_id, receiver_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meetings_host ON public.meetings(host_id, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_student ON public.agent_memories(student_id, agent_type, created_at DESC);
